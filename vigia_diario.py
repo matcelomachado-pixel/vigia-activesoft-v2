@@ -273,12 +273,14 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         try: navegador.switch_to.default_content()
         except: pass
 
-# ================= MÓDULO DE NOTAS (COM CAÇADOR DE IFRAMES V18) =================
+
+# ================= MÓDULO DE NOTAS (V18 CAÇADOR DE IFRAMES) =================
 def lancar_notas(navegador, wait, nota_info):
-    print(f"\n   [Notas] ⏳ V18: O Caçador de Iframes ativado...")
+    print(f"\n   [Notas] ⏳ V18: Buscando campo de notas em todas as dimensões...")
     
     input_escondido = None
     
+    # 🛡️ Loop Inteligente: Tenta na tela principal, depois caça em todas as caixas de iframe
     for tentativa in range(12):
         try:
             navegador.switch_to.default_content()
@@ -296,10 +298,10 @@ def lancar_notas(navegador, wait, nota_info):
             except: pass
             
         if input_escondido: break
-        time.sleep(2)
+        time.sleep(1.5)
         
     if not input_escondido:
-        raise Exception("A página de digitação não carregou ou o seletor React mudou no sistema.")
+        raise Exception("A página de digitação não carregou o React (Campo de Etapa sumiu).")
 
     print(f"   [Notas] 📍 [1/4] Selecionando a Etapa ({nota_info['etapa']})...")
     try:
@@ -656,7 +658,6 @@ def vigiar():
                     navegador.execute_script("arguments[0].click();", botao_notas_dash)
                     time.sleep(6) 
                     
-                    # Como fomos direto pra página certa, a função já vai achar o combo de Etapa!
                     lancar_notas(navegador, wait, nota)
                     
                     nota['aba'].update_cell(2, nota['coluna_planilha'], "Lançado")
