@@ -13,12 +13,14 @@ import urllib3
 import ssl
 import requests
 
+# ================= CORREÇÃO GLOBAL DE REDE E SSL =================
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 try:
     ssl._create_default_https_context = ssl._create_unverified_context
 except AttributeError:
     pass
 
+# ================= CONFIGURAÇÕES DO PROFESSOR =================
 MEU_CODIGO_ESCOLA = "COLEGIOM2"
 MEU_LOGIN = "Marcelo3892" 
 MINHA_SENHA = os.environ.get("SENHA_ACTIVESOFT", "SuaSenhaLocalAqui") 
@@ -36,6 +38,7 @@ MAPA_TURMAS = {
     "1ª SÉRIE": "1ª SÉRIE", "1ª SÉRIE EM": "1ª SÉRIE"
 }
 
+# ================= CONFIGURAÇÕES DO VIGIA =================
 SPREADSHEET_ID = '1oLo2lYbgqOgyT5Kd02pUAZ0EYWCGqLY0H1rks0aHwX4'
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
@@ -62,6 +65,7 @@ def conectar_sheets():
     client = gspread.authorize(creds)
     return client.open_by_key(SPREADSHEET_ID)
 
+# ================= FUNÇÕES DO DIÁRIO =================
 def lancar_ocorrencias(navegador, wait, aula):
     if not str(aula.get('nao_fez', '')).strip(): return
     print(f"   [Ocorrências] Iniciando: Alunos {aula['nao_fez']} | Tarefa: {aula['tarefa_nao_feita']}")
@@ -269,13 +273,13 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         try: navegador.switch_to.default_content()
         except: pass
 
-# ================= MÓDULO DE NOTAS (V16 CAÇADOR DE IFRAMES) =================
+# ================= MÓDULO DE NOTAS (COM CAÇADOR DE IFRAMES V18) =================
 def lancar_notas(navegador, wait, nota_info):
-    print(f"\n   [Notas] ⏳ V16: O Caçador de Iframes ativado...")
+    print(f"\n   [Notas] ⏳ V18: O Caçador de Iframes ativado...")
     
     input_escondido = None
     
-    for tentativa in range(10):
+    for tentativa in range(12):
         try:
             navegador.switch_to.default_content()
             input_escondido = navegador.find_element(By.XPATH, "//input[contains(@id, 'react-select')]")
@@ -295,7 +299,7 @@ def lancar_notas(navegador, wait, nota_info):
         time.sleep(2)
         
     if not input_escondido:
-        raise Exception("A página de digitação não abriu ou o seletor mudou de nome no sistema.")
+        raise Exception("A página de digitação não carregou ou o seletor React mudou no sistema.")
 
     print(f"   [Notas] 📍 [1/4] Selecionando a Etapa ({nota_info['etapa']})...")
     try:
@@ -385,9 +389,10 @@ def lancar_notas(navegador, wait, nota_info):
         print(f"   [Notas] ❌ O robô de notas tropeçou: {e}")
         raise e
 
+# ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V16 (RADAR DE IFRAMES ATIVADO)")
+    print(" 🚀 VERSÃO DO VIGIA: V18 (A ROTA DIRETA PARA AS NOTAS)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -397,6 +402,7 @@ def vigiar():
     try:
         planilha = conectar_sheets()
         
+        # 1. PARSER DE DIÁRIOS
         abas_registos = [aba for aba in planilha.worksheets() if aba.title.startswith("registos_")]
         aulas_pendentes = []
         for aba in abas_registos:
@@ -420,6 +426,7 @@ def vigiar():
                         "faltas": str(linha.get("Faltas", "")).strip(), "tipo_lancamento": status_atual
                     })
 
+        # 2. PARSER DE NOTAS
         abas_notas = [aba for aba in planilha.worksheets() if aba.title.startswith("Notas_")]
         notas_pendentes = []
         for aba in abas_notas:
@@ -459,6 +466,7 @@ def vigiar():
         if notas_pendentes: msg_inicio += f"📊 Provas: {len(notas_pendentes)}"
         avisar_telegram(msg_inicio)
         
+        # ================= LIGANDO O NAVEGADOR =================
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
@@ -484,6 +492,7 @@ def vigiar():
                 time.sleep(2)
             except: pass 
             
+            # ================= BLOCO 1: EXECUTAR DIÁRIOS =================
             for aula in aulas_pendentes:
                 try: navegador.switch_to.default_content()
                 except: pass
@@ -620,6 +629,8 @@ def vigiar():
                     try: aula['aba'].update_cell(aula['linha_planilha'], aula['coluna_status'], "Erro Sistema")
                     except: pass
 
+
+            # ================= BLOCO 2: EXECUTAR NOTAS =================
             for nota in notas_pendentes:
                 try: navegador.switch_to.default_content()
                 except: pass
@@ -637,48 +648,15 @@ def vigiar():
                     turma_site = MAPA_TURMAS.get(chave_busca, nota['turma'])
                     
                     wait_longo = WebDriverWait(navegador, 20)
-                    xpath_turma = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"
-                    botao_diario = wait_longo.until(EC.element_to_be_clickable((By.XPATH, xpath_turma)))
-                    navegador.execute_script("arguments[0].click();", botao_diario)
-                    time.sleep(5) 
                     
-                    numero_etapa = ETAPA_ATUAL[0] 
-                    script_js_notas = f"""
-                    var num = '{numero_etapa}'; var rows = document.querySelectorAll('tr');
-                    var encontrados = [];
-                    for (var i = 0; i < rows.length; i++) {{
-                        var textoLinha = (rows[i].innerText || rows[i].textContent).toUpperCase();
-                        if (textoLinha.includes(num) && textoLinha.includes('ETAPA') && !textoLinha.includes('RECUP')) {{
-                            var links = rows[i].querySelectorAll('a, button');
-                            for (var j = 0; j < links.length; j++) {{
-                                var textoLink = (links[j].innerText || links[j].textContent).toUpperCase().trim();
-                                if (textoLink !== '') encontrados.push(textoLink);
-                                if (textoLink.includes('NOTA') || textoLink.includes('DIGITAÇÃO') || textoLink.includes('AVALIA')) {{ 
-                                    links[j].click(); return 'SUCESSO'; 
-                                }}
-                            }}
-                        }}
-                    }} return 'FALHA: Links encontrados -> ' + encontrados.join(' | ');
-                    """
-                    navegador.switch_to.default_content()
-                    resultado_js = navegador.execute_script(script_js_notas)
+                    # A ROTA DIRETA DA V18 - CLICANDO NO LUGAR CERTO!
+                    print(f"   [Notas] 📍 Clicando no botão 'Digitação de notas' do painel...")
+                    xpath_turma_notas = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
+                    botao_notas_dash = wait_longo.until(EC.element_to_be_clickable((By.XPATH, xpath_turma_notas)))
+                    navegador.execute_script("arguments[0].click();", botao_notas_dash)
+                    time.sleep(6) 
                     
-                    if str(resultado_js).startswith('FALHA'):
-                        frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
-                        for f in frames:
-                            navegador.switch_to.default_content()
-                            try:
-                                navegador.switch_to.frame(f)
-                                resultado_js = navegador.execute_script(script_js_notas)
-                                if str(resultado_js) == 'SUCESSO': break
-                            except: pass
-                            
-                    print(f"   [Notas]        -> Status do Clique de Notas: {resultado_js}")
-                    if str(resultado_js).startswith('FALHA'):
-                        raise Exception(f"Link de Notas não encontrado. {resultado_js}")
-                    
-                    time.sleep(5) 
-                    
+                    # Como fomos direto pra página certa, a função já vai achar o combo de Etapa!
                     lancar_notas(navegador, wait, nota)
                     
                     nota['aba'].update_cell(2, nota['coluna_planilha'], "Lançado")
