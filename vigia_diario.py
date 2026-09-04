@@ -13,32 +13,30 @@ import urllib3
 import ssl
 import requests
 
-# ================= CORREÇÃO GLOBAL DE REDE E SSL =================
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 try:
     ssl._create_default_https_context = ssl._create_unverified_context
 except AttributeError:
     pass
 
-# ================= CONFIGURAÇÕES DO PROFESSOR =================
 MEU_CODIGO_ESCOLA = "COLEGIOM2"
 MEU_LOGIN = "Marcelo3892" 
 MINHA_SENHA = os.environ.get("SENHA_ACTIVESOFT", "SuaSenhaLocalAqui") 
 ETAPA_ATUAL = "2ª Etapa"
 
+# 🔥 DICIONÁRIO TURBINADO (Agora entende 3EM, 9A, 8B, etc)
 MAPA_TURMAS = {
-    "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD",
-    "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD",
-    "9º ANO A": "EFII-9A-FD", "9º A": "EFII-9A-FD", "9 ANO A": "EFII-9A-FD",
-    "9º ANO B": "EFII-9B-FD", "9º B": "EFII-9B-FD", "9 ANO B": "EFII-9B-FD",
-    "2ª SÉRIE": "EM-2SEM-FD", "2ª SÉRIE EM": "EM-2SEM-FD", "2 SÉRIE": "EM-2SEM-FD",
-    "3ª SÉRIE": "EM-3SEM-FD", "3ª SÉRIE EM": "EM-3SEM-FD", "3 SÉRIE": "EM-3SEM-FD",
-    "6º ANO A": "6° ANO A", "6º ANO B": "6º ANO B", "6º A": "6° ANO A", "6º B": "6º ANO B",
-    "7º ANO A": "7° ANO A", "7º ANO B": "7º ANO B", "7º A": "7° ANO A", "7º B": "7º ANO B",
-    "1ª SÉRIE": "1ª SÉRIE", "1ª SÉRIE EM": "1ª SÉRIE"
+    "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD",
+    "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD", "8B": "EFII-8B-FD",
+    "9º ANO A": "EFII-9A-FD", "9º A": "EFII-9A-FD", "9 ANO A": "EFII-9A-FD", "9A": "EFII-9A-FD",
+    "9º ANO B": "EFII-9B-FD", "9º B": "EFII-9B-FD", "9 ANO B": "EFII-9B-FD", "9B": "EFII-9B-FD",
+    "2ª SÉRIE": "EM-2SEM-FD", "2ª SÉRIE EM": "EM-2SEM-FD", "2 SÉRIE": "EM-2SEM-FD", "2EM": "EM-2SEM-FD",
+    "3ª SÉRIE": "EM-3SEM-FD", "3ª SÉRIE EM": "EM-3SEM-FD", "3 SÉRIE": "EM-3SEM-FD", "3EM": "EM-3SEM-FD",
+    "6º ANO A": "6° ANO A", "6º ANO B": "6º ANO B", "6º A": "6° ANO A", "6º B": "6º ANO B", "6A": "6° ANO A", "6B": "6º ANO B",
+    "7º ANO A": "7° ANO A", "7º ANO B": "7º ANO B", "7º A": "7° ANO A", "7º B": "7º ANO B", "7A": "7° ANO A", "7B": "7º ANO B",
+    "1ª SÉRIE": "1ª SÉRIE", "1ª SÉRIE EM": "1ª SÉRIE", "1EM": "1ª SÉRIE"
 }
 
-# ================= CONFIGURAÇÕES DO VIGIA =================
 SPREADSHEET_ID = '1oLo2lYbgqOgyT5Kd02pUAZ0EYWCGqLY0H1rks0aHwX4'
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
@@ -68,7 +66,6 @@ def conectar_sheets():
 # ================= FUNÇÕES DO DIÁRIO =================
 def lancar_ocorrencias(navegador, wait, aula):
     if not str(aula.get('nao_fez', '')).strip(): return
-    print(f"   [Ocorrências] Iniciando: Alunos {aula['nao_fez']} | Tarefa: {aula['tarefa_nao_feita']}")
     try:
         texto_ocorrencia = f"Não fez a tarefa: {aula['tarefa_nao_feita']}"
         numeros_alvo = [num.strip() for num in aula['nao_fez'].split(',')]
@@ -121,8 +118,7 @@ def lancar_ocorrencias(navegador, wait, aula):
                                 navegador.execute_script("arguments[0].click();", checkbox)
                             clicado = True
                             break 
-                if not clicado: print(f"         ❌ Não encontrei o aluno Nº {num}")
-            except Exception as e: print(f"         ⚠️ Erro ao procurar aluno Nº {num}: {e}")
+            except Exception as e: pass
 
         xpath_proximo = "//button[contains(., 'Próximo')]"
         botao_proximo = wait.until(EC.element_to_be_clickable((By.XPATH, xpath_proximo)))
@@ -166,17 +162,15 @@ def lancar_ocorrencias(navegador, wait, aula):
             navegador.execute_script("arguments[0].click();", botao_executar)
             try: wait.until(EC.alert_is_present()).accept()
             except: pass
-            print("   [Ocorrências] ✅ Fluxo concluído com sucesso!")
-        except Exception as e: print(f"         ⚠️ Erro ao clicar em Executar: {e}")
+        except Exception as e: pass
 
-    except Exception as e: print(f"   [Ocorrências] ⚠️ Erro crítico: {e}")
+    except Exception as e: pass
     finally:
         try: navegador.switch_to.default_content()
         except: pass
 
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": return
-    print(f"   [Frequência] Iniciando chamada para {aula['turma']}...")
     try:
         try: navegador.switch_to.default_content()
         except: pass
@@ -258,29 +252,26 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     opcao_falta = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[text()='Falta'] | //li[text()='Falta'] | //button[text()='Falta']")))
                     navegador.execute_script("arguments[0].click();", opcao_falta)
                     time.sleep(0.5)
-                    print(f"         ✔️ Falta cravada para o aluno Nº {num}")
-                except: print(f"         ❌ Falha ao tentar marcar falta para o aluno Nº {num}")
+                except: pass
         
         botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
         navegador.execute_script("arguments[0].click();", botao_salvar)
         time.sleep(3)
         try: wait.until(EC.alert_is_present()).accept()
         except: pass
-        print("   [Frequência] ✅ Chamada registrada e salva!")
         
-    except Exception as e: print(f"   [Frequência] ⚠️ Erro crítico: {e}")
+    except Exception as e: pass
     finally:
         try: navegador.switch_to.default_content()
         except: pass
 
 
-# ================= MÓDULO DE NOTAS (V18 CAÇADOR DE IFRAMES) =================
+# ================= MÓDULO DE NOTAS (V18.1 CAÇADOR DE IFRAMES) =================
 def lancar_notas(navegador, wait, nota_info):
-    print(f"\n   [Notas] ⏳ V18: Buscando campo de notas em todas as dimensões...")
+    print(f"   [Notas] ⏳ V18.1: Buscando campo de notas em todas as dimensões...")
     
     input_escondido = None
     
-    # 🛡️ Loop Inteligente: Tenta na tela principal, depois caça em todas as caixas de iframe
     for tentativa in range(12):
         try:
             navegador.switch_to.default_content()
@@ -394,7 +385,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V18 (A ROTA DIRETA PARA AS NOTAS)")
+    print(" 🚀 VERSÃO DO VIGIA: V18.1 (MAPA DE TURMAS EXPANDIDO)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -404,7 +395,6 @@ def vigiar():
     try:
         planilha = conectar_sheets()
         
-        # 1. PARSER DE DIÁRIOS
         abas_registos = [aba for aba in planilha.worksheets() if aba.title.startswith("registos_")]
         aulas_pendentes = []
         for aba in abas_registos:
@@ -428,7 +418,6 @@ def vigiar():
                         "faltas": str(linha.get("Faltas", "")).strip(), "tipo_lancamento": status_atual
                     })
 
-        # 2. PARSER DE NOTAS
         abas_notas = [aba for aba in planilha.worksheets() if aba.title.startswith("Notas_")]
         notas_pendentes = []
         for aba in abas_notas:
@@ -468,7 +457,6 @@ def vigiar():
         if notas_pendentes: msg_inicio += f"📊 Provas: {len(notas_pendentes)}"
         avisar_telegram(msg_inicio)
         
-        # ================= LIGANDO O NAVEGADOR =================
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
@@ -494,7 +482,6 @@ def vigiar():
                 time.sleep(2)
             except: pass 
             
-            # ================= BLOCO 1: EXECUTAR DIÁRIOS =================
             for aula in aulas_pendentes:
                 try: navegador.switch_to.default_content()
                 except: pass
@@ -631,8 +618,6 @@ def vigiar():
                     try: aula['aba'].update_cell(aula['linha_planilha'], aula['coluna_status'], "Erro Sistema")
                     except: pass
 
-
-            # ================= BLOCO 2: EXECUTAR NOTAS =================
             for nota in notas_pendentes:
                 try: navegador.switch_to.default_content()
                 except: pass
@@ -651,7 +636,6 @@ def vigiar():
                     
                     wait_longo = WebDriverWait(navegador, 20)
                     
-                    # A ROTA DIRETA DA V18 - CLICANDO NO LUGAR CERTO!
                     print(f"   [Notas] 📍 Clicando no botão 'Digitação de notas' do painel...")
                     xpath_turma_notas = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
                     botao_notas_dash = wait_longo.until(EC.element_to_be_clickable((By.XPATH, xpath_turma_notas)))
