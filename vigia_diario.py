@@ -13,18 +13,22 @@ import urllib3
 import ssl
 import requests
 
+# ================= CORREÇÃO GLOBAL DE REDE E SSL =================
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 try:
     ssl._create_default_https_context = ssl._create_unverified_context
 except AttributeError:
     pass
 
+# ================= CONFIGURAÇÕES DO PROFESSOR =================
 MEU_CODIGO_ESCOLA = "COLEGIOM2"
 MEU_LOGIN = "Marcelo3892" 
 MINHA_SENHA = os.environ.get("SENHA_ACTIVESOFT", "SuaSenhaLocalAqui") 
+
+# Etapa Padrão (Será substituída se houver a aba 'Config' na planilha)
 ETAPA_ATUAL = "2ª Etapa"
 
-# 🔥 DICIONÁRIO TURBINADO (Agora entende 3EM, 9A, 8B, etc)
+# 🔥 DICIONÁRIO DE TURMAS EXPANDIDO (Com 3EM, 9A, 8B, etc)
 MAPA_TURMAS = {
     "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD",
     "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD", "8B": "EFII-8B-FD",
@@ -118,7 +122,7 @@ def lancar_ocorrencias(navegador, wait, aula):
                                 navegador.execute_script("arguments[0].click();", checkbox)
                             clicado = True
                             break 
-            except Exception as e: pass
+            except: pass
 
         xpath_proximo = "//button[contains(., 'Próximo')]"
         botao_proximo = wait.until(EC.element_to_be_clickable((By.XPATH, xpath_proximo)))
@@ -162,9 +166,9 @@ def lancar_ocorrencias(navegador, wait, aula):
             navegador.execute_script("arguments[0].click();", botao_executar)
             try: wait.until(EC.alert_is_present()).accept()
             except: pass
-        except Exception as e: pass
+        except: pass
 
-    except Exception as e: pass
+    except: pass
     finally:
         try: navegador.switch_to.default_content()
         except: pass
@@ -260,25 +264,21 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         try: wait.until(EC.alert_is_present()).accept()
         except: pass
         
-    except Exception as e: pass
+    except: pass
     finally:
         try: navegador.switch_to.default_content()
         except: pass
 
-
-# ================= MÓDULO DE NOTAS (V18.1 CAÇADOR DE IFRAMES) =================
+# ================= MÓDULO DE NOTAS =================
 def lancar_notas(navegador, wait, nota_info):
-    print(f"   [Notas] ⏳ V18.1: Buscando campo de notas em todas as dimensões...")
-    
+    print(f"   [Notas] ⏳ Varrendo iframes...")
     input_escondido = None
-    
     for tentativa in range(12):
         try:
             navegador.switch_to.default_content()
             input_escondido = navegador.find_element(By.XPATH, "//input[contains(@id, 'react-select')]")
             if input_escondido: break
         except: pass
-        
         frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
         for f in frames:
             navegador.switch_to.default_content()
@@ -287,30 +287,25 @@ def lancar_notas(navegador, wait, nota_info):
                 input_escondido = navegador.find_element(By.XPATH, "//input[contains(@id, 'react-select')]")
                 if input_escondido: break
             except: pass
-            
         if input_escondido: break
         time.sleep(1.5)
         
-    if not input_escondido:
-        raise Exception("A página de digitação não carregou o React (Campo de Etapa sumiu).")
+    if not input_escondido: raise Exception("Campo de Etapa sumiu.")
 
     print(f"   [Notas] 📍 [1/4] Selecionando a Etapa ({nota_info['etapa']})...")
     try:
         navegador.execute_script("arguments[0].parentNode.parentNode.click();", input_escondido)
         time.sleep(1)
-        
         navegador.execute_script("arguments[0].focus();", input_escondido)
         input_escondido.send_keys(nota_info['etapa'])
         time.sleep(1.5) 
         
         opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{nota_info['etapa']}']")
-        if opcoes:
-            navegador.execute_script("arguments[0].click();", opcoes[-1])
+        if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
         else:
             navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", input_escondido)
             time.sleep(0.5)
             navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", input_escondido)
-            
         time.sleep(1.5)
         
         btn_consultar = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Consultar')]")))
@@ -342,7 +337,7 @@ def lancar_notas(navegador, wait, nota_info):
         btn_salvar = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Salvar')]")))
         navegador.execute_script("arguments[0].click();", btn_salvar)
         
-        print("   [Notas]        -> Aguardando alerta de confirmação (SweetAlert)...")
+        print("   [Notas]        -> Aguardando alerta de confirmação...")
         wait_modal = WebDriverWait(navegador, 10)
         btn_fechar = wait_modal.until(EC.presence_of_element_located((By.XPATH, "//button[contains(@class, 'swal2-confirm') or text()='Fechar']")))
         navegador.execute_script("arguments[0].click();", btn_fechar)
@@ -357,15 +352,12 @@ def lancar_notas(navegador, wait, nota_info):
                 indice_coluna_alvo = i
                 break
                 
-        if indice_coluna_alvo == -1:
-            print("   [Notas]        ⚠️ Nome exato não achado. Forçando última coluna.")
-            indice_coluna_alvo = len(cabecalhos_provas) - 1 
+        if indice_coluna_alvo == -1: indice_coluna_alvo = len(cabecalhos_provas) - 1 
         
         for num_aluno, nota in nota_info['notas_alunos'].items():
             try:
                 linha_aluno = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[text()='{num_aluno}']/ancestor::tr")))
                 todas_as_caixas = linha_aluno.find_elements(By.XPATH, ".//input[contains(@class, 'InputNotaStyled')]")
-                
                 if len(todas_as_caixas) > indice_coluna_alvo:
                     input_nota_certo = todas_as_caixas[indice_coluna_alvo]
                     navegador.execute_script(JS_REACT_SETTER, input_nota_certo, nota)
@@ -373,19 +365,18 @@ def lancar_notas(navegador, wait, nota_info):
                     input_nota_certo.send_keys(Keys.TAB)
                     print(f"   [Notas]        ✔️ Lançado: Aluno {num_aluno} -> {nota}")
                     time.sleep(0.5)
-            except Exception as e_nota:
-                print(f"   [Notas]        ❌ Erro ao lançar nota para o aluno {num_aluno}: {e_nota}")
+            except Exception as e_nota: print(f"   [Notas]        ❌ Erro aluno {num_aluno}")
 
         print("   [Notas] ✅ Finalizado com sucesso! Notas na coluna correta.")
-        
     except Exception as e:
         print(f"   [Notas] ❌ O robô de notas tropeçou: {e}")
         raise e
 
 # ================= MOTOR CENTRAL =================
 def vigiar():
+    global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V18.1 (MAPA DE TURMAS EXPANDIDO)")
+    print(" 🚀 VERSÃO DO VIGIA: V19 (ETAPA DINÂMICA E MAPA TURBINADO)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -394,6 +385,16 @@ def vigiar():
     
     try:
         planilha = conectar_sheets()
+        
+        # 🛡️ NOVIDADE: LENDO A ETAPA DA ABA CONFIG 🛡️
+        try:
+            aba_config = planilha.worksheet("Config")
+            valor_etapa = aba_config.acell("B1").value
+            if valor_etapa:
+                ETAPA_ATUAL = str(valor_etapa).strip()
+                print(f"   ⚙️  INFO: Etapa atualizada pela planilha -> '{ETAPA_ATUAL}'")
+        except:
+            print(f"   ⚙️  INFO: Aba 'Config' não achada. Usando padrão -> '{ETAPA_ATUAL}'")
         
         abas_registos = [aba for aba in planilha.worksheets() if aba.title.startswith("registos_")]
         aulas_pendentes = []
@@ -452,10 +453,6 @@ def vigiar():
             return
 
         print(f"🚨 TAREFAS: {len(aulas_pendentes)} Diários | {len(notas_pendentes)} Provas")
-        msg_inicio = f"🤖 <b>Super Vigia Iniciado!</b>\n"
-        if aulas_pendentes: msg_inicio += f"📝 Diários: {len(aulas_pendentes)}\n"
-        if notas_pendentes: msg_inicio += f"📊 Provas: {len(notas_pendentes)}"
-        avisar_telegram(msg_inicio)
         
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--headless=new")
@@ -529,7 +526,6 @@ def vigiar():
                                 navegador.switch_to.frame(f)
                                 if navegador.execute_script(script_js) == 'SUCESSO': break
                             except: pass
-                    
                     time.sleep(3)
                     
                     try:
@@ -579,7 +575,6 @@ def vigiar():
                                 botao_alvo = botao
                                 linha_alvo = linha
                                 break
-                                
                         if not botao_alvo or not linha_alvo: raise Exception(f"Data {aula['data']} não localizada.")
 
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", linha_alvo)
@@ -603,15 +598,10 @@ def vigiar():
                         navegador.execute_script("arguments[0].click();", botao_gravar)
                         time.sleep(3)
 
-                    try: wait.until(EC.alert_is_present()).accept()
-                    except: pass
-                    
                     lancar_ocorrencias(navegador, wait, aula)
                     lancar_faltas(navegador, wait, aula, ETAPA_ATUAL)
-                    
                     navegador.switch_to.default_content() 
                     aula['aba'].update_cell(aula['linha_planilha'], aula['coluna_status'], "Lançado")
-                    avisar_telegram(f"✅ <b>DIÁRIO SUCESSO</b>\nTurma: {aula['turma']}\nData: {aula['data']}")
                     
                 except Exception as e_aula:
                     print(f"   ❌ Erro na aula {aula['data']}: {e_aula}")
@@ -643,9 +633,7 @@ def vigiar():
                     time.sleep(6) 
                     
                     lancar_notas(navegador, wait, nota)
-                    
                     nota['aba'].update_cell(2, nota['coluna_planilha'], "Lançado")
-                    avisar_telegram(f"✅ <b>NOTAS SUCESSO</b>\nTurma: {nota['turma']}\nProva: {nota['nome_prova']} ({nota['data_prova']})")
                     
                 except Exception as e_nota:
                     print(f"   ❌ Erro ao lançar notas: {e_nota}")
