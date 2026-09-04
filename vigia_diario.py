@@ -199,64 +199,83 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             
         turma_exata = turma_bruta.replace("º", "°")
         
-        # 🔥 SOLUÇÃO RESGATADA DAS NOTAS: CAÇADOR DE IFRAMES E JS_REACT_SETTER 🔥
-        print("   [Frequência] 📍 Aplicando injeção JS nas caixas de seleção...")
-        inputs_react = []
-        for tentativa in range(5):
-            navegador.switch_to.default_content()
-            inputs_react = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
-            if inputs_react: break
-            
-            frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
-            for f in frames:
-                navegador.switch_to.default_content()
-                try:
-                    navegador.switch_to.frame(f)
-                    inputs_react = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
-                    if inputs_react: break
-                except: pass
-            if inputs_react: break
-            time.sleep(1.5)
-
+        print("   [Frequência] 📍 Aplicando injeção JS dinâmica nas caixas de seleção...")
+        
+        # Função blindada: Re-busca os elementos na tela a cada iteração para driblar o React
         def preencher_select_blindado(idx, texto):
             try:
-                inp = inputs_react[idx]
-                navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
-                time.sleep(0.5)
+                # 1. Busca os inputs na hora (evita StaleElementReference)
+                navegador.switch_to.default_content()
+                inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+                
+                if not inps: # Caçador de iframes
+                    frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
+                    for f in frames:
+                        navegador.switch_to.default_content()
+                        try:
+                            navegador.switch_to.frame(f)
+                            inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+                            if inps: break
+                        except: pass
+                        
+                if idx >= len(inps): return
+                inp = inps[idx]
+                
+                # 2. Rola a tela até a caixa e espera
+                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
+                time.sleep(1)
+                
+                # 3. Força a abertura da caixa
+                try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
+                except: pass
+                time.sleep(1)
+                
                 navegador.execute_script("arguments[0].focus();", inp)
-                inp.send_keys(texto)
+                
+                # 4. Tenta digitar. Se o React der "not interactable", injeta na força bruta com JS (A Vacina das Notas)
+                try:
+                    inp.send_keys(Keys.CONTROL + "a")
+                    inp.send_keys(Keys.BACKSPACE)
+                    inp.send_keys(texto)
+                except:
+                    navegador.execute_script("arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", inp, texto)
+                    
                 time.sleep(1.5)
                 
-                opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{texto}'] | //li[text()='{texto}']")
+                # 5. Clica na opção que apareceu
+                opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{texto}'] | //li[text()='{texto}'] | //div[contains(text(), '{texto}')]")
                 if opcoes:
                     navegador.execute_script("arguments[0].click();", opcoes[-1])
                 else:
                     navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
                     time.sleep(0.5)
                     navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
-                time.sleep(0.5)
+                
+                time.sleep(2) # Pausa crucial para o Activesoft carregar o próximo filtro
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
 
-        if len(inputs_react) >= 4:
-            preencher_select_blindado(1, curso)        
-            preencher_select_blindado(2, serie)        
-            preencher_select_blindado(3, turma_exata)  
-            preencher_select_blindado(4, etapa_atual)  
+        # Índices: Curso(1), Série(2), Turma(3), Etapa(4)
+        preencher_select_blindado(1, curso)        
+        preencher_select_blindado(2, serie)        
+        preencher_select_blindado(3, turma_exata)  
+        preencher_select_blindado(4, etapa_atual)  
         
         try:
-            input_data_ini = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'InitialDatePicker')]")))
-            input_data_fim = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'FinalDatePicker')]")))
+            input_data_ini = navegador.find_element(By.XPATH, "//input[contains(@class, 'InitialDatePicker')] | //input[@name='dataInicial']")
+            input_data_fim = navegador.find_element(By.XPATH, "//input[contains(@class, 'FinalDatePicker')] | //input[@name='dataFinal']")
             
-            # Usando a injeção JS robusta para as datas também
             navegador.execute_script(JS_REACT_SETTER, input_data_ini, aula['data'])
             navegador.execute_script(JS_REACT_SETTER, input_data_fim, aula['data'])
-            time.sleep(0.5)
+            time.sleep(1)
         except: pass
 
-        botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
-        navegador.execute_script("arguments[0].click();", botao_consultar)
-        time.sleep(5) 
+        try:
+            botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
+            navegador.execute_script("arguments[0].click();", botao_consultar)
+            time.sleep(5) 
+        except:
+            print("   [Frequência] ⚠️ Não consegui clicar em 'Consultar'.")
         
         try:
             botao_selecione = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Selecione')]")))
@@ -285,13 +304,16 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     print(f"         ✔️ Falta cravada para o aluno Nº {num}")
                 except: print(f"         ❌ Falha ao tentar marcar falta para o aluno Nº {num}")
         
-        botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
-        navegador.execute_script("arguments[0].click();", botao_salvar)
-        time.sleep(3)
-        try: wait.until(EC.alert_is_present()).accept()
-        except: pass
-        print("   [Frequência] ✅ Chamada registrada e salva!")
-        
+        try:
+            botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
+            navegador.execute_script("arguments[0].click();", botao_salvar)
+            time.sleep(3)
+            try: wait.until(EC.alert_is_present()).accept()
+            except: pass
+            print("   [Frequência] ✅ Chamada registrada e salva!")
+        except:
+            print("   [Frequência] ⚠️ Botão de salvar não encontrado (A lista de alunos pode não ter carregado).")
+            
     except Exception as e: print(f"   [Frequência] ⚠️ Erro crítico: {e}")
     finally:
         try: navegador.switch_to.default_content()
