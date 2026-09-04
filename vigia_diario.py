@@ -175,6 +175,7 @@ def lancar_ocorrencias(navegador, wait, aula):
 
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": return
+    print(f"   [Frequência] Iniciando chamada para {aula['turma']}...")
     try:
         try: navegador.switch_to.default_content()
         except: pass
@@ -197,35 +198,60 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta: serie = f"{s}ª SÉRIE"
             
         turma_exata = turma_bruta.replace("º", "°")
-        inputs_react = navegador.find_elements(By.XPATH, "//input[@aria-autocomplete='list']")
         
-        def preencher_select(idx, texto):
+        # 🔥 SOLUÇÃO RESGATADA DAS NOTAS: CAÇADOR DE IFRAMES E JS_REACT_SETTER 🔥
+        print("   [Frequência] 📍 Aplicando injeção JS nas caixas de seleção...")
+        inputs_react = []
+        for tentativa in range(5):
+            navegador.switch_to.default_content()
+            inputs_react = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+            if inputs_react: break
+            
+            frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
+            for f in frames:
+                navegador.switch_to.default_content()
+                try:
+                    navegador.switch_to.frame(f)
+                    inputs_react = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+                    if inputs_react: break
+                except: pass
+            if inputs_react: break
+            time.sleep(1.5)
+
+        def preencher_select_blindado(idx, texto):
             try:
                 inp = inputs_react[idx]
+                navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
+                time.sleep(0.5)
                 navegador.execute_script("arguments[0].focus();", inp)
-                time.sleep(0.5)
                 inp.send_keys(texto)
-                time.sleep(1.5) 
-                inp.send_keys(Keys.ENTER)
+                time.sleep(1.5)
+                
+                opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{texto}'] | //li[text()='{texto}']")
+                if opcoes:
+                    navegador.execute_script("arguments[0].click();", opcoes[-1])
+                else:
+                    navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
+                    time.sleep(0.5)
+                    navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
                 time.sleep(0.5)
-            except: pass
+            except Exception as e:
+                print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
 
-        if len(inputs_react) >= 5:
-            preencher_select(1, curso)        
-            preencher_select(2, serie)        
-            preencher_select(3, turma_exata)  
-            preencher_select(4, etapa_atual)  
+        if len(inputs_react) >= 4:
+            preencher_select_blindado(1, curso)        
+            preencher_select_blindado(2, serie)        
+            preencher_select_blindado(3, turma_exata)  
+            preencher_select_blindado(4, etapa_atual)  
         
         try:
-            input_data_ini = navegador.find_element(By.XPATH, "//input[contains(@class, 'InitialDatePicker')]")
-            input_data_fim = navegador.find_element(By.XPATH, "//input[contains(@class, 'FinalDatePicker')]")
-            for inp in [input_data_ini, input_data_fim]:
-                inp.click()
-                inp.send_keys(Keys.CONTROL + "a")
-                inp.send_keys(Keys.BACKSPACE)
-                inp.send_keys(aula['data'])
-                inp.send_keys(Keys.ESCAPE) 
-                time.sleep(0.5)
+            input_data_ini = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'InitialDatePicker')]")))
+            input_data_fim = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'FinalDatePicker')]")))
+            
+            # Usando a injeção JS robusta para as datas também
+            navegador.execute_script(JS_REACT_SETTER, input_data_ini, aula['data'])
+            navegador.execute_script(JS_REACT_SETTER, input_data_fim, aula['data'])
+            time.sleep(0.5)
         except: pass
 
         botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
@@ -256,15 +282,17 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     opcao_falta = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[text()='Falta'] | //li[text()='Falta'] | //button[text()='Falta']")))
                     navegador.execute_script("arguments[0].click();", opcao_falta)
                     time.sleep(0.5)
-                except: pass
+                    print(f"         ✔️ Falta cravada para o aluno Nº {num}")
+                except: print(f"         ❌ Falha ao tentar marcar falta para o aluno Nº {num}")
         
         botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
         navegador.execute_script("arguments[0].click();", botao_salvar)
         time.sleep(3)
         try: wait.until(EC.alert_is_present()).accept()
         except: pass
+        print("   [Frequência] ✅ Chamada registrada e salva!")
         
-    except: pass
+    except Exception as e: print(f"   [Frequência] ⚠️ Erro crítico: {e}")
     finally:
         try: navegador.switch_to.default_content()
         except: pass
