@@ -330,18 +330,29 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 except Exception as erro_falta: 
                     print(f"         ❌ Falha ao tentar marcar falta para o aluno Nº {num}")
         
+        # ================= BLOCO DE SALVAR CORRIGIDO =================
         try:
-            botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
+            # 1. Clica no botão Salvar principal
+            botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Salvar')]")))
+            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
+            time.sleep(1)
             navegador.execute_script("arguments[0].click();", botao_salvar)
-            time.sleep(3)
-            try: wait.until(EC.alert_is_present()).accept()
-            except: pass
-            print("   [Frequência] ✅ Lista de presença salva com sucesso!")
-        except:
-            print("   [Frequência] ⚠️ Botão de salvar não encontrado.")
+            print("   [Frequência] ⏳ Aguardando janela de confirmação (Sim)...")
+            time.sleep(2)
+            
+            # 2. Clica no botão "Sim" do pop-up (SweetAlert2)
+            try:
+                botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
+                navegador.execute_script("arguments[0].click();", botao_sim)
+                time.sleep(3)
+                print("   [Frequência] ✅ Lista de presença salva e confirmada com sucesso!")
+            except Exception as modal_erro:
+                print(f"   [Frequência] ⚠️ Botão 'Sim' não apareceu. Erro: {str(modal_erro).split(';')[0]}")
+                
+        except Exception as e_salvar:
+            print(f"   [Frequência] ⚠️ Botão de salvar não encontrado. Erro: {str(e_salvar).split(';')[0]}")
             
     except Exception as e: print(f"   [Frequência] ⚠️ Erro crítico: {e}")
-
 # ================= MÓDULO DE NOTAS =================
 def lancar_notas(navegador, wait, nota_info):
     print(f"   [Notas] ⏳ Varrendo iframes...")
