@@ -25,7 +25,7 @@ MEU_CODIGO_ESCOLA = "COLEGIOM2"
 MEU_LOGIN = "Marcelo3892" 
 MINHA_SENHA = os.environ.get("SENHA_ACTIVESOFT", "SuaSenhaLocalAqui") 
 
-ETAPA_ATUAL = "2ª Etapa"
+ETAPA_ATUAL = "3ª Etapa"
 
 MAPA_TURMAS = {
     "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD",
