@@ -173,9 +173,18 @@ def lancar_ocorrencias(navegador, wait, aula):
         try: navegador.switch_to.default_content()
         except: pass
 
+# ================= MÓDULO DE FALTAS (ATUALIZADO) =================
 def lancar_faltas(navegador, wait, aula, etapa_atual):
-    if aula['tipo_lancamento'] != "Pendente_Nova": return
-    print(f"   [Frequência] Iniciando chamada para {aula['turma']}...")
+    if aula['tipo_lancamento'] != "Pendente_Nova": 
+        print(f"   [Frequência] ⏭️ Aula de edição ('Pendente'). Pulando a chamada para evitar duplicidade.")
+        return
+        
+    faltas_str = str(aula.get('faltas', '')).strip()
+    if faltas_str:
+        print(f"   [Frequência] 🔍 Encontradas faltas para os alunos: {faltas_str}")
+    else:
+        print(f"   [Frequência] 🔍 Nenhuma falta registrada (Todos presentes).")
+
     try:
         try: navegador.switch_to.default_content()
         except: pass
@@ -191,24 +200,20 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         turma_bruta = aula['turma'].upper()
         curso = "FUNDAMENTAL" if "ANO" in turma_bruta else "MÉDIO"
         
-        serie = ""
+        serie_busca = ""
         for s in ["6", "7", "8", "9"]:
-            if s in turma_bruta: serie = f"{s}° ANO"
+            if s in turma_bruta: serie_busca = s 
         for s in ["1", "2", "3"]:
-            if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta: serie = f"{s}ª SÉRIE"
+            if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta: serie_busca = s
             
         turma_exata = turma_bruta.replace("º", "°")
         
-        print("   [Frequência] 📍 Aplicando injeção JS dinâmica nas caixas de seleção...")
-        
-        # Função blindada: Re-busca os elementos na tela a cada iteração para driblar o React
         def preencher_select_blindado(idx, texto):
             try:
-                # 1. Busca os inputs na hora (evita StaleElementReference)
                 navegador.switch_to.default_content()
                 inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
                 
-                if not inps: # Caçador de iframes
+                if not inps: 
                     frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
                     for f in frames:
                         navegador.switch_to.default_content()
@@ -221,88 +226,109 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 if idx >= len(inps): return
                 inp = inps[idx]
                 
-                # 2. Rola a tela até a caixa e espera
                 navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
                 time.sleep(1)
                 
-                # 3. Força a abertura da caixa
                 try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
                 except: pass
                 time.sleep(1)
                 
                 navegador.execute_script("arguments[0].focus();", inp)
                 
-                # 4. Tenta digitar. Se o React der "not interactable", injeta na força bruta com JS (A Vacina das Notas)
                 try:
                     inp.send_keys(Keys.CONTROL + "a")
                     inp.send_keys(Keys.BACKSPACE)
                     inp.send_keys(texto)
+                    time.sleep(1.5)
                 except:
-                    navegador.execute_script("arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", inp, texto)
-                    
-                time.sleep(1.5)
+                    navegador.execute_script(JS_REACT_SETTER, inp, texto)
+                    time.sleep(2)
                 
-                # 5. Clica na opção que apareceu
-                opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{texto}'] | //li[text()='{texto}'] | //div[contains(text(), '{texto}')]")
+                opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')]")
+                
                 if opcoes:
-                    navegador.execute_script("arguments[0].click();", opcoes[-1])
+                    clicou_exato = False
+                    for opcao in opcoes:
+                        if texto.upper() == opcao.text.strip().upper():
+                            navegador.execute_script("arguments[0].click();", opcao)
+                            clicou_exato = True
+                            break
+                    
+                    if not clicou_exato:
+                        navegador.execute_script("arguments[0].click();", opcoes[-1])
                 else:
-                    navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
-                    time.sleep(0.5)
-                    navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
+                    try:
+                        inp.send_keys(Keys.ARROW_DOWN)
+                        time.sleep(0.5)
+                        inp.send_keys(Keys.ENTER)
+                    except:
+                        navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
+                        time.sleep(0.5)
+                        navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
                 
-                time.sleep(2) # Pausa crucial para o Activesoft carregar o próximo filtro
+                time.sleep(2.5) 
             except Exception as e:
-                print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
+                print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}")
 
-        # Índices: Curso(1), Série(2), Turma(3), Etapa(4)
         preencher_select_blindado(1, curso)        
-        preencher_select_blindado(2, serie)        
+        preencher_select_blindado(2, serie_busca)       
         preencher_select_blindado(3, turma_exata)  
-        preencher_select_blindado(4, etapa_atual)  
+        preencher_select_blindado(5, etapa_atual)
         
         try:
-            input_data_ini = navegador.find_element(By.XPATH, "//input[contains(@class, 'InitialDatePicker')] | //input[@name='dataInicial']")
-            input_data_fim = navegador.find_element(By.XPATH, "//input[contains(@class, 'FinalDatePicker')] | //input[@name='dataFinal']")
-            
-            navegador.execute_script(JS_REACT_SETTER, input_data_ini, aula['data'])
-            navegador.execute_script(JS_REACT_SETTER, input_data_fim, aula['data'])
-            time.sleep(1)
+            inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
+            if inps_data:
+                for input_dt in inps_data[:2]:
+                    navegador.execute_script(JS_REACT_SETTER, input_dt, aula['data'])
+                    time.sleep(0.5)
         except: pass
 
         try:
             botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
             navegador.execute_script("arguments[0].click();", botao_consultar)
-            time.sleep(5) 
+            time.sleep(8) 
         except:
             print("   [Frequência] ⚠️ Não consegui clicar em 'Consultar'.")
         
+        def clicar_opcao_tabela(botao_alvo, texto_opcao):
+            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
+            time.sleep(0.5)
+            try: botao_alvo.click() 
+            except: navegador.execute_script("arguments[0].click();", botao_alvo) 
+            time.sleep(1) 
+            xpath = f"//*[normalize-space(text())='{texto_opcao}']"
+            opcoes = navegador.find_elements(By.XPATH, xpath)
+            for op in opcoes:
+                if op.is_displayed():
+                    try:
+                        op.click() 
+                        return
+                    except:
+                        webdriver.ActionChains(navegador).move_to_element(op).click().perform()
+                        return
+            if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
+
         try:
-            botao_selecione = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Selecione')]")))
-            navegador.execute_script("arguments[0].click();", botao_selecione)
-            time.sleep(1)
-            opcao_presente = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Presente')] | //li[contains(text(), 'Presente')]")))
-            navegador.execute_script("arguments[0].click();", opcao_presente)
-            time.sleep(2)
-        except: pass
+            botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
+            clicar_opcao_tabela(botao_selecione, "Presente")
+            print("   [Frequência] ✔️ Todos os alunos marcados como 'Presente'.")
+            time.sleep(3) 
+        except Exception: 
+            print(f"   [Frequência] ⚠️ Não foi possível marcar 'Presente' para todos.")
             
-        faltas_str = str(aula.get('faltas', '')).strip()
         if faltas_str:
             numeros_falta = [n.strip() for n in faltas_str.split(',')]
             for num in numeros_falta:
                 try:
-                    linha = navegador.find_element(By.XPATH, f"//tr[td[normalize-space(text())='{num}']]")
+                    indice_linha = int(num) + 1 
+                    xpath_linha = f"(//tbody/tr)[{indice_linha}]"
+                    linha = navegador.find_element(By.XPATH, xpath_linha)
                     botao_status = linha.find_element(By.XPATH, ".//button[contains(@class, 'Toggle__ToggleButton')]")
-                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_status)
-                    time.sleep(0.5)
-                    navegador.execute_script("arguments[0].click();", botao_status)
-                    time.sleep(1)
-                    
-                    opcao_falta = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[text()='Falta'] | //li[text()='Falta'] | //button[text()='Falta']")))
-                    navegador.execute_script("arguments[0].click();", opcao_falta)
-                    time.sleep(0.5)
+                    clicar_opcao_tabela(botao_status, "Falta")
                     print(f"         ✔️ Falta cravada para o aluno Nº {num}")
-                except: print(f"         ❌ Falha ao tentar marcar falta para o aluno Nº {num}")
+                    time.sleep(1)
+                except Exception as erro_falta: 
+                    print(f"         ❌ Falha ao tentar marcar falta para o aluno Nº {num}")
         
         try:
             botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
@@ -310,14 +336,11 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             time.sleep(3)
             try: wait.until(EC.alert_is_present()).accept()
             except: pass
-            print("   [Frequência] ✅ Chamada registrada e salva!")
+            print("   [Frequência] ✅ Lista de presença salva com sucesso!")
         except:
-            print("   [Frequência] ⚠️ Botão de salvar não encontrado (A lista de alunos pode não ter carregado).")
+            print("   [Frequência] ⚠️ Botão de salvar não encontrado.")
             
     except Exception as e: print(f"   [Frequência] ⚠️ Erro crítico: {e}")
-    finally:
-        try: navegador.switch_to.default_content()
-        except: pass
 
 # ================= MÓDULO DE NOTAS =================
 def lancar_notas(navegador, wait, nota_info):
@@ -426,7 +449,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V19 (ETAPA DINÂMICA E MAPA TURBINADO)")
+    print(" 🚀 VERSÃO DO VIGIA: V20 (O FINAL - FALTAS + NOTAS + OCORRÊNCIAS)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -529,11 +552,21 @@ def vigiar():
                 time.sleep(2)
             except: pass 
             
+            # ================= LAÇO DO DIÁRIO COM FEEDBACKS COMPLETOS =================
             for aula in aulas_pendentes:
+                tipo = aula.get('tipo_lancamento', '')
+                
+                print("\n" + "="*60)
+                if tipo == 'Pendente':
+                    print(f" 📝 AULA ENCONTRADA (EDIÇÃO): {aula['turma']} - {aula['data']}")
+                elif tipo == 'Pendente_Nova':
+                    print(f" 🆕 AULA ENCONTRADA (CRIAÇÃO): {aula['turma']} - {aula['data']}")
+                print("="*60)
+                
                 try: navegador.switch_to.default_content()
                 except: pass
                 
-                print(f"\n-> [DIÁRIO] Iniciando fluxo da turma {aula['turma']} ({aula['data']})")
+                print(f"-> [DIÁRIO] Iniciando fluxo da turma {aula['turma']} ({aula['data']})")
                 try:
                     navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
                     time.sleep(3)
@@ -648,21 +681,39 @@ def vigiar():
                         navegador.execute_script("arguments[0].click();", botao_gravar)
                         time.sleep(3)
 
+                    print(f"   [Diário] ✔️ Conteúdo da aula gravado com sucesso!")
+
+                    # Ocorrências com Feedback Turbinado
+                    nao_fez_str = str(aula.get('nao_fez', '')).strip()
+                    if nao_fez_str:
+                        print(f"   [Ocorrência] 🔍 Encontrados alunos sem Para Casa: {nao_fez_str}")
                     lancar_ocorrencias(navegador, wait, aula)
+                    if nao_fez_str:
+                        print(f"   [Ocorrência] ✅ Ocorrências verificadas/lançadas!")
+
+                    # Faltas com Feedback Turbinado
                     lancar_faltas(navegador, wait, aula, ETAPA_ATUAL)
+                    
                     navegador.switch_to.default_content() 
                     aula['aba'].update_cell(aula['linha_planilha'], aula['coluna_status'], "Lançado")
+                    print(f"   ✅ Diário marcado como 'Lançado' na planilha.")
                     
                 except Exception as e_aula:
                     print(f"   ❌ Erro na aula {aula['data']}: {e_aula}")
                     try: aula['aba'].update_cell(aula['linha_planilha'], aula['coluna_status'], "Erro Sistema")
                     except: pass
 
+            # ================= LAÇO DAS NOTAS COM FEEDBACKS COMPLETOS =================
             for nota in notas_pendentes:
                 try: navegador.switch_to.default_content()
                 except: pass
                 
-                print(f"\n-> [NOTAS] Iniciando fluxo da avaliação '{nota['nome_prova']}' - Turma {nota['turma']}")
+                print("\n" + "="*60)
+                print(f" 🎯 PROVA ENCONTRADA: {nota['nome_prova']} | Valor: {nota['valor_prova']}")
+                print(f" 🏫 TURMA: {nota['turma']} - Data: {nota['data_prova']}")
+                print("="*60)
+                
+                print(f"-> [NOTAS] Iniciando fluxo da avaliação '{nota['nome_prova']}' - Turma {nota['turma']}")
                 try:
                     navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
                     time.sleep(3)
@@ -684,6 +735,7 @@ def vigiar():
                     
                     lancar_notas(navegador, wait, nota)
                     nota['aba'].update_cell(2, nota['coluna_planilha'], "Lançado")
+                    print("   [Notas] ✅ Prova marcada como 'Lançado' na planilha.")
                     
                 except Exception as e_nota:
                     print(f"   ❌ Erro ao lançar notas: {e_nota}")
