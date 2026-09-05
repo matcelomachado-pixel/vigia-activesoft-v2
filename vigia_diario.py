@@ -25,10 +25,8 @@ MEU_CODIGO_ESCOLA = "COLEGIOM2"
 MEU_LOGIN = "Marcelo3892" 
 MINHA_SENHA = os.environ.get("SENHA_ACTIVESOFT", "SuaSenhaLocalAqui") 
 
-# Etapa Padrão (Será substituída se houver a aba 'Config' na planilha)
 ETAPA_ATUAL = "2ª Etapa"
 
-# 🔥 DICIONÁRIO DE TURMAS EXPANDIDO (Com 3EM, 9A, 8B, etc)
 MAPA_TURMAS = {
     "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD",
     "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD", "8B": "EFII-8B-FD",
@@ -173,7 +171,7 @@ def lancar_ocorrencias(navegador, wait, aula):
         try: navegador.switch_to.default_content()
         except: pass
 
-# ================= MÓDULO DE FALTAS (ATUALIZADO) =================
+# ================= MÓDULO DE FALTAS =================
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": 
         print(f"   [Frequência] ⏭️ Aula de edição ('Pendente'). Pulando a chamada para evitar duplicidade.")
@@ -212,7 +210,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             try:
                 navegador.switch_to.default_content()
                 inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
-                
                 if not inps: 
                     frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
                     for f in frames:
@@ -222,19 +219,14 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                             inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
                             if inps: break
                         except: pass
-                        
                 if idx >= len(inps): return
                 inp = inps[idx]
-                
                 navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
                 time.sleep(1)
-                
                 try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
                 except: pass
                 time.sleep(1)
-                
                 navegador.execute_script("arguments[0].focus();", inp)
-                
                 try:
                     inp.send_keys(Keys.CONTROL + "a")
                     inp.send_keys(Keys.BACKSPACE)
@@ -243,9 +235,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 except:
                     navegador.execute_script(JS_REACT_SETTER, inp, texto)
                     time.sleep(2)
-                
                 opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')]")
-                
                 if opcoes:
                     clicou_exato = False
                     for opcao in opcoes:
@@ -253,9 +243,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                             navegador.execute_script("arguments[0].click();", opcao)
                             clicou_exato = True
                             break
-                    
-                    if not clicou_exato:
-                        navegador.execute_script("arguments[0].click();", opcoes[-1])
+                    if not clicou_exato: navegador.execute_script("arguments[0].click();", opcoes[-1])
                 else:
                     try:
                         inp.send_keys(Keys.ARROW_DOWN)
@@ -265,7 +253,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
-                
                 time.sleep(2.5) 
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}")
@@ -330,7 +317,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 except Exception as erro_falta: 
                     print(f"         ❌ Falha ao tentar marcar falta para o aluno Nº {num}")
         
-        # ================= BLOCO DE SALVAR CORRIGIDO =================
         try:
             # 1. Clica no botão Salvar principal
             botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Salvar')]")))
@@ -346,13 +332,13 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 navegador.execute_script("arguments[0].click();", botao_sim)
                 time.sleep(3)
                 print("   [Frequência] ✅ Lista de presença salva e confirmada com sucesso!")
-            except Exception as modal_erro:
-                print(f"   [Frequência] ⚠️ Botão 'Sim' não apareceu. Erro: {str(modal_erro).split(';')[0]}")
-                
-        except Exception as e_salvar:
-            print(f"   [Frequência] ⚠️ Botão de salvar não encontrado. Erro: {str(e_salvar).split(';')[0]}")
+            except Exception:
+                print(f"   [Frequência] ⚠️ Botão 'Sim' não apareceu, mas o comando foi enviado.")
+        except:
+            print("   [Frequência] ⚠️ Botão de salvar não encontrado.")
             
     except Exception as e: print(f"   [Frequência] ⚠️ Erro crítico: {e}")
+
 # ================= MÓDULO DE NOTAS =================
 def lancar_notas(navegador, wait, nota_info):
     print(f"   [Notas] ⏳ Varrendo iframes...")
@@ -460,7 +446,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V20 (O FINAL - FALTAS + NOTAS + OCORRÊNCIAS)")
+    print(" 🚀 VERSÃO DO VIGIA: V21 (BLOQUEIO ANTI-HIT-AND-RUN)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -470,7 +456,6 @@ def vigiar():
     try:
         planilha = conectar_sheets()
         
-        # 🛡️ NOVIDADE: LENDO A ETAPA DA ABA CONFIG 🛡️
         try:
             aba_config = planilha.worksheet("Config")
             valor_etapa = aba_config.acell("B1").value
@@ -563,7 +548,6 @@ def vigiar():
                 time.sleep(2)
             except: pass 
             
-            # ================= LAÇO DO DIÁRIO COM FEEDBACKS COMPLETOS =================
             for aula in aulas_pendentes:
                 tipo = aula.get('tipo_lancamento', '')
                 
@@ -654,7 +638,25 @@ def vigiar():
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_gravar_novo)
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].click();", botao_gravar_novo)
-                        time.sleep(3) 
+                        
+                        # 🔥 VERIFICAÇÃO ANTI HIT-AND-RUN PARA CRIAÇÃO 🔥
+                        print("   [Diário] ⏳ Aguardando confirmação do sistema...")
+                        time.sleep(2.5)
+                        try:
+                            erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
+                            if erro_swal and erro_swal[0].is_displayed():
+                                titulo_erro = navegador.find_element(By.ID, "swal2-title").text
+                                fechar_erro = navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
+                                navegador.execute_script("arguments[0].click();", fechar_erro)
+                                raise Exception(f"Bloqueado pelo sistema: {titulo_erro}")
+                                
+                            btn_sim_diario = navegador.find_elements(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
+                            if btn_sim_diario and btn_sim_diario[0].is_displayed():
+                                navegador.execute_script("arguments[0].click();", btn_sim_diario[0])
+                                time.sleep(2)
+                        except Exception as check_e:
+                            if "Bloqueado" in str(check_e): raise check_e
+                            
                     else:
                         data_busca = aula['data'].strip()[:5]
                         xpath_botoes = "//a[contains(text(), 'Editar') or contains(@title, 'Editar')] | //button[contains(text(), 'Editar')] | //input[@value='Editar']"
@@ -690,11 +692,27 @@ def vigiar():
                         
                         botao_gravar = linha_alvo.find_element(By.XPATH, ".//a[contains(text(), 'Gravar')] | .//button[contains(text(), 'Gravar')] | .//input[@value='Gravar']")
                         navegador.execute_script("arguments[0].click();", botao_gravar)
-                        time.sleep(3)
+                        
+                        # 🔥 VERIFICAÇÃO ANTI HIT-AND-RUN PARA EDIÇÃO 🔥
+                        print("   [Diário] ⏳ Aguardando confirmação do sistema...")
+                        time.sleep(2.5)
+                        try:
+                            erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
+                            if erro_swal and erro_swal[0].is_displayed():
+                                titulo_erro = navegador.find_element(By.ID, "swal2-title").text
+                                fechar_erro = navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
+                                navegador.execute_script("arguments[0].click();", fechar_erro)
+                                raise Exception(f"Bloqueado pelo sistema: {titulo_erro}")
+                                
+                            btn_sim_diario = navegador.find_elements(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
+                            if btn_sim_diario and btn_sim_diario[0].is_displayed():
+                                navegador.execute_script("arguments[0].click();", btn_sim_diario[0])
+                                time.sleep(2)
+                        except Exception as check_e:
+                            if "Bloqueado" in str(check_e): raise check_e
 
                     print(f"   [Diário] ✔️ Conteúdo da aula gravado com sucesso!")
 
-                    # Ocorrências com Feedback Turbinado
                     nao_fez_str = str(aula.get('nao_fez', '')).strip()
                     if nao_fez_str:
                         print(f"   [Ocorrência] 🔍 Encontrados alunos sem Para Casa: {nao_fez_str}")
@@ -702,7 +720,6 @@ def vigiar():
                     if nao_fez_str:
                         print(f"   [Ocorrência] ✅ Ocorrências verificadas/lançadas!")
 
-                    # Faltas com Feedback Turbinado
                     lancar_faltas(navegador, wait, aula, ETAPA_ATUAL)
                     
                     navegador.switch_to.default_content() 
@@ -714,7 +731,6 @@ def vigiar():
                     try: aula['aba'].update_cell(aula['linha_planilha'], aula['coluna_status'], "Erro Sistema")
                     except: pass
 
-            # ================= LAÇO DAS NOTAS COM FEEDBACKS COMPLETOS =================
             for nota in notas_pendentes:
                 try: navegador.switch_to.default_content()
                 except: pass
