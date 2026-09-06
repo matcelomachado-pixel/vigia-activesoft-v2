@@ -446,7 +446,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V21 (BLOQUEIO ANTI-HIT-AND-RUN)")
+    print(" 🚀 VERSÃO DO VIGIA: V22 (BLINDAGEM TOTAL DE SALVAMENTO)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -460,7 +460,8 @@ def vigiar():
             aba_config = planilha.worksheet("Config")
             valor_etapa = aba_config.acell("B1").value
             if valor_etapa:
-                ETAPA_ATUAL = str(valor_etapa).strip()
+                # Transforma qualquer jeito que você digitar na planilha para o formato exato "3ª Etapa"
+                ETAPA_ATUAL = str(valor_etapa).strip().lower().replace("etapa", "Etapa")
                 print(f"   ⚙️  INFO: Etapa atualizada pela planilha -> '{ETAPA_ATUAL}'")
         except:
             print(f"   ⚙️  INFO: Aba 'Config' não achada. Usando padrão -> '{ETAPA_ATUAL}'")
@@ -637,11 +638,26 @@ def vigiar():
                         botao_gravar_novo = wait.until(EC.element_to_be_clickable((By.ID, "btnGravarNovo")))
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_gravar_novo)
                         time.sleep(0.5)
-                        navegador.execute_script("arguments[0].click();", botao_gravar_novo)
                         
-                        # 🔥 VERIFICAÇÃO ANTI HIT-AND-RUN PARA CRIAÇÃO 🔥
+                        # Tenta o clique nativo primeiro (menos suscetível a bloqueios do React)
+                        try: botao_gravar_novo.click()
+                        except: navegador.execute_script("arguments[0].click();", botao_gravar_novo)
+                        
+                        # 🔥 VERIFICAÇÃO ANTI HIT-AND-RUN PARA CRIAÇÃO TURBINADA 🔥
                         print("   [Diário] ⏳ Aguardando confirmação do sistema...")
                         time.sleep(2.5)
+                        
+                        # 1. Checa Alerta Nativo do Navegador
+                        try:
+                            alerta = navegador.switch_to.alert
+                            msg_alerta = alerta.text
+                            alerta.accept()
+                            raise Exception(f"Bloqueado (Alerta de sistema): {msg_alerta}")
+                        except Exception as e_alerta:
+                            if "Bloqueado" in str(e_alerta): raise e_alerta
+                            pass 
+
+                        # 2. Checa SweetAlerts (Erro ou Sucesso)
                         try:
                             erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
                             if erro_swal and erro_swal[0].is_displayed():
@@ -656,6 +672,12 @@ def vigiar():
                                 time.sleep(2)
                         except Exception as check_e:
                             if "Bloqueado" in str(check_e): raise check_e
+                            
+                        # 3. Checa mensagens vermelhas/Toast na tela
+                        erros_texto = navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]")
+                        for err in erros_texto:
+                            if err.is_displayed():
+                                raise Exception(f"Aviso na tela: {err.text}")
                             
                     else:
                         data_busca = aula['data'].strip()[:5]
@@ -691,11 +713,25 @@ def vigiar():
                             time.sleep(1)
                         
                         botao_gravar = linha_alvo.find_element(By.XPATH, ".//a[contains(text(), 'Gravar')] | .//button[contains(text(), 'Gravar')] | .//input[@value='Gravar']")
-                        navegador.execute_script("arguments[0].click();", botao_gravar)
                         
-                        # 🔥 VERIFICAÇÃO ANTI HIT-AND-RUN PARA EDIÇÃO 🔥
+                        try: botao_gravar.click()
+                        except: navegador.execute_script("arguments[0].click();", botao_gravar)
+                        
+                        # 🔥 VERIFICAÇÃO ANTI HIT-AND-RUN PARA EDIÇÃO TURBINADA 🔥
                         print("   [Diário] ⏳ Aguardando confirmação do sistema...")
                         time.sleep(2.5)
+                        
+                        # 1. Alerta nativo
+                        try:
+                            alerta = navegador.switch_to.alert
+                            msg_alerta = alerta.text
+                            alerta.accept()
+                            raise Exception(f"Bloqueado (Alerta de sistema): {msg_alerta}")
+                        except Exception as e_alerta:
+                            if "Bloqueado" in str(e_alerta): raise e_alerta
+                            pass 
+
+                        # 2. SweetAlert
                         try:
                             erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
                             if erro_swal and erro_swal[0].is_displayed():
@@ -710,6 +746,12 @@ def vigiar():
                                 time.sleep(2)
                         except Exception as check_e:
                             if "Bloqueado" in str(check_e): raise check_e
+
+                        # 3. Avisos Toast
+                        erros_texto = navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]")
+                        for err in erros_texto:
+                            if err.is_displayed():
+                                raise Exception(f"Aviso na tela: {err.text}")
 
                     print(f"   [Diário] ✔️ Conteúdo da aula gravado com sucesso!")
 
