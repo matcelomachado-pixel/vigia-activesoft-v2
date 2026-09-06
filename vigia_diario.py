@@ -446,7 +446,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V23 (LEITOR DE ERROS PROFUNDO)")
+    print(" 🚀 VERSÃO DO VIGIA: V25 (TRADUTOR DE ETAPAS E RECUPERAÇÃO)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -456,20 +456,22 @@ def vigiar():
     try:
         planilha = conectar_sheets()
         
+        # 🛡️ TRADUTOR INTELIGENTE DE ETAPAS 🛡️
         try:
             aba_config = planilha.worksheet("Config")
-            valor_etapa = str(aba_config.acell("B1").value).strip()
-            if valor_etapa:
-                # 🛡️ FORÇA BRUTA: Procura o número 1, 2 ou 3 dentro da célula e ignora o resto
-                numero = "2" # Fallback
-                for n in ["1", "2", "3"]:
-                    if n in valor_etapa:
-                        numero = n
-                        break
-                ETAPA_ATUAL = f"{numero}ª Etapa"
-                print(f"   ⚙️  INFO: Etapa atualizada pela planilha -> '{ETAPA_ATUAL}'")
+            valor_cru = str(aba_config.acell("B1").value).strip().lower()
+            if valor_cru:
+                if "rec" in valor_cru and "1" in valor_cru: ETAPA_ATUAL = "Rec. 1ª Etapa"
+                elif "rec" in valor_cru and "2" in valor_cru: ETAPA_ATUAL = "Rec. 2ª Etapa"
+                elif "rec" in valor_cru and "3" in valor_cru: ETAPA_ATUAL = "Rec. 3ª Etapa"
+                elif "1" in valor_cru: ETAPA_ATUAL = "1ª Etapa"
+                elif "2" in valor_cru: ETAPA_ATUAL = "2ª Etapa"
+                elif "3" in valor_cru: ETAPA_ATUAL = "3ª Etapa"
+                else: ETAPA_ATUAL = "2ª Etapa" # Fallback de segurança
+                print(f"   ⚙️  INFO: Etapa reconhecida e blindada -> '{ETAPA_ATUAL}'")
         except:
-            print(f"   ⚙️  INFO: Aba 'Config' não achada. Usando padrão -> '{ETAPA_ATUAL}'")        
+            print(f"   ⚙️  INFO: Aba 'Config' não achada. Usando padrão -> '{ETAPA_ATUAL}'")
+        
         abas_registos = [aba for aba in planilha.worksheets() if aba.title.startswith("registos_")]
         aulas_pendentes = []
         for aba in abas_registos:
@@ -584,12 +586,19 @@ def vigiar():
                     navegador.execute_script("arguments[0].click();", botao_diario)
                     time.sleep(5) 
                     
-                    numero_etapa = ETAPA_ATUAL[0] 
+                    # 🔥 JAVASCRIPT INTELIGENTE: Diferencia Etapa Normal de Recuperação perfeitamente 🔥
                     script_js = f"""
-                    var num = '{numero_etapa}'; var rows = document.querySelectorAll('tr');
+                    var etapaAlvo = '{ETAPA_ATUAL}'.toUpperCase();
+                    var rows = document.querySelectorAll('tr');
                     for (var i = 0; i < rows.length; i++) {{
                         var textoLinha = (rows[i].innerText || rows[i].textContent).toUpperCase();
-                        if (textoLinha.includes(num) && textoLinha.includes('ETAPA') && !textoLinha.includes('REC')) {{
+                        
+                        if (textoLinha.includes(etapaAlvo)) {{
+                            // Se buscamos a normal, IGNORA se a linha for Recuperação
+                            if (!etapaAlvo.includes('REC') && textoLinha.includes('REC')) {{
+                                continue; 
+                            }}
+                            
                             var links = rows[i].querySelectorAll('a');
                             for (var j = 0; j < links.length; j++) {{
                                 var textoLink = (links[j].innerText || links[j].textContent).toUpperCase();
@@ -643,13 +652,12 @@ def vigiar():
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_gravar_novo)
                         time.sleep(0.5)
                         
-                        # Retornado para o formato puro e seguro que você usava antes
-                        navegador.execute_script("arguments[0].click();", botao_gravar_novo)
+                        try: botao_gravar_novo.click()
+                        except: navegador.execute_script("arguments[0].click();", botao_gravar_novo)
                         
                         print("   [Diário] ⏳ Aguardando confirmação do sistema...")
                         time.sleep(3)
                         
-                        # 1. Alerta nativo
                         try:
                             alerta = navegador.switch_to.alert
                             msg_alerta = alerta.text
@@ -659,7 +667,6 @@ def vigiar():
                             if "Bloqueado" in str(e_alerta): raise e_alerta
                             pass 
 
-                        # 2. SweetAlerts
                         try:
                             erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
                             if erro_swal and erro_swal[0].is_displayed():
@@ -675,14 +682,11 @@ def vigiar():
                         except Exception as check_e:
                             if "Bloqueado" in str(check_e): raise check_e
                             
-                        # 3. Avisos Toast PROFUNDOS (Lê a caixa inteira)
                         erros_texto = navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]")
                         for err in erros_texto:
                             if err.is_displayed():
-                                try:
-                                    motivo_completo = err.find_element(By.XPATH, "..").text
-                                except:
-                                    motivo_completo = err.text
+                                try: motivo_completo = err.find_element(By.XPATH, "..").text
+                                except: motivo_completo = err.text
                                 raise Exception(f"Aviso na tela: {motivo_completo.replace(chr(10), ' - ')}")
                             
                     else:
@@ -724,7 +728,6 @@ def vigiar():
                         print("   [Diário] ⏳ Aguardando confirmação do sistema...")
                         time.sleep(3)
                         
-                        # 1. Alerta nativo
                         try:
                             alerta = navegador.switch_to.alert
                             msg_alerta = alerta.text
@@ -734,7 +737,6 @@ def vigiar():
                             if "Bloqueado" in str(e_alerta): raise e_alerta
                             pass 
 
-                        # 2. SweetAlert
                         try:
                             erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
                             if erro_swal and erro_swal[0].is_displayed():
@@ -750,14 +752,11 @@ def vigiar():
                         except Exception as check_e:
                             if "Bloqueado" in str(check_e): raise check_e
 
-                        # 3. Avisos Toast PROFUNDOS
                         erros_texto = navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]")
                         for err in erros_texto:
                             if err.is_displayed():
-                                try:
-                                    motivo_completo = err.find_element(By.XPATH, "..").text
-                                except:
-                                    motivo_completo = err.text
+                                try: motivo_completo = err.find_element(By.XPATH, "..").text
+                                except: motivo_completo = err.text
                                 raise Exception(f"Aviso na tela: {motivo_completo.replace(chr(10), ' - ')}")
 
                     print(f"   [Diário] ✔️ Conteúdo da aula gravado com sucesso!")
