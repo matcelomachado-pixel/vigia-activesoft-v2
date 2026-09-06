@@ -446,7 +446,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V22 (BLINDAGEM TOTAL DE SALVAMENTO)")
+    print(" 🚀 VERSÃO DO VIGIA: V23 (LEITOR DE ERROS PROFUNDO)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -460,7 +460,6 @@ def vigiar():
             aba_config = planilha.worksheet("Config")
             valor_etapa = aba_config.acell("B1").value
             if valor_etapa:
-                # Transforma qualquer jeito que você digitar na planilha para o formato exato "3ª Etapa"
                 ETAPA_ATUAL = str(valor_etapa).strip().lower().replace("etapa", "Etapa")
                 print(f"   ⚙️  INFO: Etapa atualizada pela planilha -> '{ETAPA_ATUAL}'")
         except:
@@ -585,7 +584,7 @@ def vigiar():
                     var num = '{numero_etapa}'; var rows = document.querySelectorAll('tr');
                     for (var i = 0; i < rows.length; i++) {{
                         var textoLinha = (rows[i].innerText || rows[i].textContent).toUpperCase();
-                        if (textoLinha.includes(num) && textoLinha.includes('ETAPA') && !textoLinha.includes('RECUP')) {{
+                        if (textoLinha.includes(num) && textoLinha.includes('ETAPA') && !textoLinha.includes('REC')) {{
                             var links = rows[i].querySelectorAll('a');
                             for (var j = 0; j < links.length; j++) {{
                                 var textoLink = (links[j].innerText || links[j].textContent).toUpperCase();
@@ -639,15 +638,13 @@ def vigiar():
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_gravar_novo)
                         time.sleep(0.5)
                         
-                        # Tenta o clique nativo primeiro (menos suscetível a bloqueios do React)
-                        try: botao_gravar_novo.click()
-                        except: navegador.execute_script("arguments[0].click();", botao_gravar_novo)
+                        # Retornado para o formato puro e seguro que você usava antes
+                        navegador.execute_script("arguments[0].click();", botao_gravar_novo)
                         
-                        # 🔥 VERIFICAÇÃO ANTI HIT-AND-RUN PARA CRIAÇÃO TURBINADA 🔥
                         print("   [Diário] ⏳ Aguardando confirmação do sistema...")
-                        time.sleep(2.5)
+                        time.sleep(3)
                         
-                        # 1. Checa Alerta Nativo do Navegador
+                        # 1. Alerta nativo
                         try:
                             alerta = navegador.switch_to.alert
                             msg_alerta = alerta.text
@@ -657,7 +654,7 @@ def vigiar():
                             if "Bloqueado" in str(e_alerta): raise e_alerta
                             pass 
 
-                        # 2. Checa SweetAlerts (Erro ou Sucesso)
+                        # 2. SweetAlerts
                         try:
                             erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
                             if erro_swal and erro_swal[0].is_displayed():
@@ -673,11 +670,15 @@ def vigiar():
                         except Exception as check_e:
                             if "Bloqueado" in str(check_e): raise check_e
                             
-                        # 3. Checa mensagens vermelhas/Toast na tela
+                        # 3. Avisos Toast PROFUNDOS (Lê a caixa inteira)
                         erros_texto = navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]")
                         for err in erros_texto:
                             if err.is_displayed():
-                                raise Exception(f"Aviso na tela: {err.text}")
+                                try:
+                                    motivo_completo = err.find_element(By.XPATH, "..").text
+                                except:
+                                    motivo_completo = err.text
+                                raise Exception(f"Aviso na tela: {motivo_completo.replace(chr(10), ' - ')}")
                             
                     else:
                         data_busca = aula['data'].strip()[:5]
@@ -713,13 +714,10 @@ def vigiar():
                             time.sleep(1)
                         
                         botao_gravar = linha_alvo.find_element(By.XPATH, ".//a[contains(text(), 'Gravar')] | .//button[contains(text(), 'Gravar')] | .//input[@value='Gravar']")
+                        navegador.execute_script("arguments[0].click();", botao_gravar)
                         
-                        try: botao_gravar.click()
-                        except: navegador.execute_script("arguments[0].click();", botao_gravar)
-                        
-                        # 🔥 VERIFICAÇÃO ANTI HIT-AND-RUN PARA EDIÇÃO TURBINADA 🔥
                         print("   [Diário] ⏳ Aguardando confirmação do sistema...")
-                        time.sleep(2.5)
+                        time.sleep(3)
                         
                         # 1. Alerta nativo
                         try:
@@ -747,11 +745,15 @@ def vigiar():
                         except Exception as check_e:
                             if "Bloqueado" in str(check_e): raise check_e
 
-                        # 3. Avisos Toast
+                        # 3. Avisos Toast PROFUNDOS
                         erros_texto = navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]")
                         for err in erros_texto:
                             if err.is_displayed():
-                                raise Exception(f"Aviso na tela: {err.text}")
+                                try:
+                                    motivo_completo = err.find_element(By.XPATH, "..").text
+                                except:
+                                    motivo_completo = err.text
+                                raise Exception(f"Aviso na tela: {motivo_completo.replace(chr(10), ' - ')}")
 
                     print(f"   [Diário] ✔️ Conteúdo da aula gravado com sucesso!")
 
