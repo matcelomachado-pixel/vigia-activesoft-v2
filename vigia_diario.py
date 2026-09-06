@@ -458,13 +458,18 @@ def vigiar():
         
         try:
             aba_config = planilha.worksheet("Config")
-            valor_etapa = aba_config.acell("B1").value
+            valor_etapa = str(aba_config.acell("B1").value).strip()
             if valor_etapa:
-                ETAPA_ATUAL = str(valor_etapa).strip().lower().replace("etapa", "Etapa")
+                # 🛡️ FORÇA BRUTA: Procura o número 1, 2 ou 3 dentro da célula e ignora o resto
+                numero = "2" # Fallback
+                for n in ["1", "2", "3"]:
+                    if n in valor_etapa:
+                        numero = n
+                        break
+                ETAPA_ATUAL = f"{numero}ª Etapa"
                 print(f"   ⚙️  INFO: Etapa atualizada pela planilha -> '{ETAPA_ATUAL}'")
         except:
-            print(f"   ⚙️  INFO: Aba 'Config' não achada. Usando padrão -> '{ETAPA_ATUAL}'")
-        
+            print(f"   ⚙️  INFO: Aba 'Config' não achada. Usando padrão -> '{ETAPA_ATUAL}'")        
         abas_registos = [aba for aba in planilha.worksheets() if aba.title.startswith("registos_")]
         aulas_pendentes = []
         for aba in abas_registos:
