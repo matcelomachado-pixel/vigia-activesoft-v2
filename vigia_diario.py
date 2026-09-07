@@ -509,14 +509,33 @@ def vigiar():
                     data_prova = str(dados[2][col_idx]).strip()
                     valor_prova = str(dados[3][col_idx]).strip()
                     
-                    notas_alunos = {}
-                    for row_idx in range(4, len(dados)):
-                        numero_aluno = str(dados[row_idx][0]).strip()
-                        nota = str(dados[row_idx][col_idx]).strip()
+                    for num_aluno, nota in nota_info['notas_alunos'].items():
+            try:
+                linha_aluno = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[text()='{num_aluno}']/ancestor::tr")))
+                todas_as_caixas = linha_aluno.find_elements(By.XPATH, ".//input[contains(@class, 'InputNotaStyled')]")
+                if len(todas_as_caixas) > indice_coluna_alvo:
+                    input_nota_certo = todas_as_caixas[indice_coluna_alvo]
+                    
+                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_nota_certo)
+                    time.sleep(0.2)
+                    
+                    # 🔥 Tratamento especial e simulação de teclado humano para o Zero
+                    if str(nota) in ["0", "0.0", "0,0"]:
+                        try:
+                            input_nota_certo.click()
+                            input_nota_certo.send_keys(Keys.BACKSPACE)
+                            input_nota_certo.send_keys("0,0") # Formato exigido para não sumir
+                        except:
+                            navegador.execute_script(JS_REACT_SETTER, input_nota_certo, "0,0")
+                    else:
+                        navegador.execute_script(JS_REACT_SETTER, input_nota_certo, nota)
                         
-                        # 🔥 Garante que só ignore se a célula estiver 100% vazia
-                        if numero_aluno and nota != "":
-                            notas_alunos[numero_aluno] = nota
+                    time.sleep(0.2)
+                    input_nota_certo.send_keys(Keys.TAB)
+                    print(f"   [Notas]        ✔️ Lançado: Aluno {num_aluno} -> {nota}")
+                    time.sleep(0.5)
+            except Exception as e_nota: 
+                print(f"   [Notas]        ❌ Erro aluno {num_aluno}")
                             
                     notas_pendentes.append({
                         "aba": aba, "turma": turma_nome,
