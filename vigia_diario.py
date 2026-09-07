@@ -513,7 +513,9 @@ def vigiar():
                     for row_idx in range(4, len(dados)):
                         numero_aluno = str(dados[row_idx][0]).strip()
                         nota = str(dados[row_idx][col_idx]).strip()
-                        if numero_aluno and nota:
+                        
+                        # 🔥 Garante que só ignore se a célula estiver 100% vazia
+                        if numero_aluno and nota != "":
                             notas_alunos[numero_aluno] = nota
                             
                     notas_pendentes.append({
