@@ -25,7 +25,7 @@ MEU_CODIGO_ESCOLA = "COLEGIOM2"
 MEU_LOGIN = "Marcelo3892" 
 MINHA_SENHA = os.environ.get("SENHA_ACTIVESOFT", "SuaSenhaLocalAqui") 
 
-ETAPA_ATUAL = "3ª Etapa"
+ETAPA_ATUAL = "2ª Etapa"
 
 MAPA_TURMAS = {
     "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD",
@@ -318,7 +318,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     print(f"         ❌ Falha ao tentar marcar falta para o aluno Nº {num}")
         
         try:
-            # 1. Clica no botão Salvar principal
             botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Salvar')]")))
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
             time.sleep(1)
@@ -326,7 +325,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             print("   [Frequência] ⏳ Aguardando janela de confirmação (Sim)...")
             time.sleep(2)
             
-            # 2. Clica no botão "Sim" do pop-up (SweetAlert2)
             try:
                 botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
                 navegador.execute_script("arguments[0].click();", botao_sim)
@@ -434,7 +432,6 @@ def lancar_notas(navegador, wait, nota_info):
                     navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_nota_certo)
                     time.sleep(0.2)
                     
-                    # 🔥 Tratamento especial e simulação de teclado humano para o Zero
                     if str(nota).strip() in ["0", "0.0", "0,0"]:
                         try:
                             input_nota_certo.click()
@@ -456,11 +453,12 @@ def lancar_notas(navegador, wait, nota_info):
     except Exception as e:
         print(f"   [Notas] ❌ O robô de notas tropeçou: {e}")
         raise e
+
 # ================= MOTOR CENTRAL =================
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V25 (TRADUTOR DE ETAPAS E RECUPERAÇÃO)")
+    print(" 🚀 VERSÃO DO VIGIA: V25 (TRADUTOR DE ETAPAS E TELEGRAM INTEGRADO)")
     print(" 👁️ SUPER VIGIA CENTRAL (DIÁRIOS + NOTAS) - GITHUB ACTIONS")
     print("="*60)
     
@@ -470,7 +468,6 @@ def vigiar():
     try:
         planilha = conectar_sheets()
         
-        # 🛡️ TRADUTOR INTELIGENTE DE ETAPAS 🛡️
         try:
             aba_config = planilha.worksheet("Config")
             valor_cru = str(aba_config.acell("B1").value).strip().lower()
@@ -481,7 +478,7 @@ def vigiar():
                 elif "1" in valor_cru: ETAPA_ATUAL = "1ª Etapa"
                 elif "2" in valor_cru: ETAPA_ATUAL = "2ª Etapa"
                 elif "3" in valor_cru: ETAPA_ATUAL = "3ª Etapa"
-                else: ETAPA_ATUAL = "2ª Etapa" # Fallback de segurança
+                else: ETAPA_ATUAL = "2ª Etapa"
                 print(f"   ⚙️  INFO: Etapa reconhecida e blindada -> '{ETAPA_ATUAL}'")
         except:
             print(f"   ⚙️  INFO: Aba 'Config' não achada. Usando padrão -> '{ETAPA_ATUAL}'")
@@ -523,33 +520,12 @@ def vigiar():
                     data_prova = str(dados[2][col_idx]).strip()
                     valor_prova = str(dados[3][col_idx]).strip()
                     
-                    for num_aluno, nota in nota_info['notas_alunos'].items():
-            try:
-                linha_aluno = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[text()='{num_aluno}']/ancestor::tr")))
-                todas_as_caixas = linha_aluno.find_elements(By.XPATH, ".//input[contains(@class, 'InputNotaStyled')]")
-                if len(todas_as_caixas) > indice_coluna_alvo:
-                    input_nota_certo = todas_as_caixas[indice_coluna_alvo]
-                    
-                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_nota_certo)
-                    time.sleep(0.2)
-                    
-                    # 🔥 Tratamento especial e simulação de teclado humano para o Zero
-                    if str(nota) in ["0", "0.0", "0,0"]:
-                        try:
-                            input_nota_certo.click()
-                            input_nota_certo.send_keys(Keys.BACKSPACE)
-                            input_nota_certo.send_keys("0,0") # Formato exigido para não sumir
-                        except:
-                            navegador.execute_script(JS_REACT_SETTER, input_nota_certo, "0,0")
-                    else:
-                        navegador.execute_script(JS_REACT_SETTER, input_nota_certo, nota)
-                        
-                    time.sleep(0.2)
-                    input_nota_certo.send_keys(Keys.TAB)
-                    print(f"   [Notas]        ✔️ Lançado: Aluno {num_aluno} -> {nota}")
-                    time.sleep(0.5)
-            except Exception as e_nota: 
-                print(f"   [Notas]        ❌ Erro aluno {num_aluno}")
+                    notas_alunos = {}
+                    for row_idx in range(4, len(dados)):
+                        numero_aluno = str(dados[row_idx][0]).strip()
+                        nota = str(dados[row_idx][col_idx]).strip()
+                        if numero_aluno and nota != "":
+                            notas_alunos[numero_aluno] = nota
                             
                     notas_pendentes.append({
                         "aba": aba, "turma": turma_nome,
@@ -564,6 +540,8 @@ def vigiar():
             return
 
         print(f"🚨 TAREFAS: {len(aulas_pendentes)} Diários | {len(notas_pendentes)} Provas")
+        
+        relatorio_telegram = f"🤖 <b>VIGIA EXECUTADO</b>\n⚙️ <b>Etapa:</b> {ETAPA_ATUAL}\n\n"
         
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--headless=new")
@@ -621,7 +599,6 @@ def vigiar():
                     navegador.execute_script("arguments[0].click();", botao_diario)
                     time.sleep(5) 
                     
-                    # 🔥 JAVASCRIPT INTELIGENTE: Diferencia Etapa Normal de Recuperação perfeitamente 🔥
                     script_js = f"""
                     var etapaAlvo = '{ETAPA_ATUAL}'.toUpperCase();
                     var rows = document.querySelectorAll('tr');
@@ -629,11 +606,7 @@ def vigiar():
                         var textoLinha = (rows[i].innerText || rows[i].textContent).toUpperCase();
                         
                         if (textoLinha.includes(etapaAlvo)) {{
-                            // Se buscamos a normal, IGNORA se a linha for Recuperação
-                            if (!etapaAlvo.includes('REC') && textoLinha.includes('REC')) {{
-                                continue; 
-                            }}
-                            
+                            if (!etapaAlvo.includes('REC') && textoLinha.includes('REC')) {{ continue; }}
                             var links = rows[i].querySelectorAll('a');
                             for (var j = 0; j < links.length; j++) {{
                                 var textoLink = (links[j].innerText || links[j].textContent).toUpperCase();
@@ -809,10 +782,18 @@ def vigiar():
                     aula['aba'].update_cell(aula['linha_planilha'], aula['coluna_status'], "Lançado")
                     print(f"   ✅ Diário marcado como 'Lançado' na planilha.")
                     
+                    msg_extra = ""
+                    if nao_fez_str: msg_extra += f"\n   ↳ Ocorrências (Casa): {len(nao_fez_str.split(','))} aluno(s)"
+                    faltas_str = str(aula.get('faltas', '')).strip()
+                    if faltas_str: msg_extra += f"\n   ↳ Faltas lançadas: {faltas_str}"
+                    relatorio_telegram += f"✅ <b>Diário - {aula['turma']} ({aula['data']})</b>\n   ↳ Status: Lançado e Salvo!{msg_extra}\n\n"
+                    
                 except Exception as e_aula:
+                    erro_str = str(e_aula).replace(chr(10), " - ")[:150]
                     print(f"   ❌ Erro na aula {aula['data']}: {e_aula}")
                     try: aula['aba'].update_cell(aula['linha_planilha'], aula['coluna_status'], "Erro Sistema")
                     except: pass
+                    relatorio_telegram += f"❌ <b>Diário - {aula['turma']} ({aula['data']})</b>\n   ↳ Falha: {erro_str}\n\n"
 
             for nota in notas_pendentes:
                 try: navegador.switch_to.default_content()
@@ -847,14 +828,19 @@ def vigiar():
                     nota['aba'].update_cell(2, nota['coluna_planilha'], "Lançado")
                     print("   [Notas] ✅ Prova marcada como 'Lançado' na planilha.")
                     
+                    relatorio_telegram += f"✅ <b>Notas - {nota['turma']}</b>\n   ↳ Prova: '{nota['nome_prova']}' lançada com sucesso!\n\n"
+                    
                 except Exception as e_nota:
+                    erro_str = str(e_nota).replace(chr(10), " - ")[:150]
                     print(f"   ❌ Erro ao lançar notas: {e_nota}")
                     try: nota['aba'].update_cell(2, nota['coluna_planilha'], "Erro Sistema")
                     except: pass
+                    relatorio_telegram += f"❌ <b>Notas - {nota['turma']}</b>\n   ↳ Falha na prova '{nota['nome_prova']}': {erro_str}\n\n"
 
         finally:
             navegador.quit()
             print("\n🔒 Fechando o navegador. Execução concluída!\n")
+            avisar_telegram(relatorio_telegram)
 
     except Exception as erro_geral:
         print(f"⚠️ Erro crítico: {erro_geral}")
