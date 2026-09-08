@@ -430,18 +430,32 @@ def lancar_notas(navegador, wait, nota_info):
                 todas_as_caixas = linha_aluno.find_elements(By.XPATH, ".//input[contains(@class, 'InputNotaStyled')]")
                 if len(todas_as_caixas) > indice_coluna_alvo:
                     input_nota_certo = todas_as_caixas[indice_coluna_alvo]
-                    navegador.execute_script(JS_REACT_SETTER, input_nota_certo, nota)
+                    
+                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_nota_certo)
+                    time.sleep(0.2)
+                    
+                    # 🔥 Tratamento especial e simulação de teclado humano para o Zero
+                    if str(nota).strip() in ["0", "0.0", "0,0"]:
+                        try:
+                            input_nota_certo.click()
+                            input_nota_certo.send_keys(Keys.BACKSPACE)
+                            input_nota_certo.send_keys("0,0") 
+                        except:
+                            navegador.execute_script(JS_REACT_SETTER, input_nota_certo, "0,0")
+                    else:
+                        navegador.execute_script(JS_REACT_SETTER, input_nota_certo, nota)
+                        
                     time.sleep(0.2)
                     input_nota_certo.send_keys(Keys.TAB)
                     print(f"   [Notas]        ✔️ Lançado: Aluno {num_aluno} -> {nota}")
                     time.sleep(0.5)
-            except Exception as e_nota: print(f"   [Notas]        ❌ Erro aluno {num_aluno}")
+            except Exception as e_nota: 
+                print(f"   [Notas]        ❌ Erro aluno {num_aluno}")
 
         print("   [Notas] ✅ Finalizado com sucesso! Notas na coluna correta.")
     except Exception as e:
         print(f"   [Notas] ❌ O robô de notas tropeçou: {e}")
         raise e
-
 # ================= MOTOR CENTRAL =================
 def vigiar():
     global ETAPA_ATUAL
