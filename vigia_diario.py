@@ -178,6 +178,12 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         except: pass
         time.sleep(2)
         
+        # 🔥 BLINDAGEM DA V36: Sempre começa da Home do Professor para limpar o React 🔥
+        try:
+            navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
+            time.sleep(3)
+        except: pass
+        
         try:
             botao_freq = wait.until(EC.element_to_be_clickable((By.ID, "frequencia_em_lote")))
             navegador.execute_script("arguments[0].click();", botao_freq)
@@ -251,21 +257,19 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         preencher_select_blindado(3, turma_exata)  
         preencher_select_blindado(5, etapa_atual)
         
-        # 🔥 DIGITAÇÃO RESTAURADA COM TECLADO PARA A DATA 🔥
-        inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
-        for input_dt in inps_data[:2]:
-            try:
-                input_dt.click()
-                input_dt.send_keys(Keys.CONTROL + "a")
-                input_dt.send_keys(Keys.BACKSPACE)
-                input_dt.send_keys(aula['data'])
-                input_dt.send_keys(Keys.ESCAPE)
-                time.sleep(0.5)
-            except: pass
+        try:
+            inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
+            if inps_data:
+                for input_dt in inps_data[:2]:
+                    navegador.execute_script(JS_REACT_SETTER, input_dt, aula['data'])
+                    time.sleep(0.5)
+        except: pass
 
-        botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
-        navegador.execute_script("arguments[0].click();", botao_consultar)
-        time.sleep(8) 
+        try:
+            botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
+            navegador.execute_script("arguments[0].click();", botao_consultar)
+            time.sleep(8) 
+        except: pass
         
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
@@ -285,9 +289,11 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         return
             if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
 
-        botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
-        clicar_opcao_tabela(botao_selecione, "Presente")
-        time.sleep(3) 
+        try:
+            botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
+            clicar_opcao_tabela(botao_selecione, "Presente")
+            time.sleep(3) 
+        except: pass
             
         if faltas_str:
             numeros_falta = [n.strip() for n in faltas_str.split(',')]
@@ -301,26 +307,32 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     time.sleep(1)
                 except: pass
         
-        # 🔥 SILENCIADOR REMOVIDO: AGORA ELE AVISA SE O BOTÃO FALHAR 🔥
-        botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Salvar')]")))
-        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
-        time.sleep(1)
-        navegador.execute_script("arguments[0].click();", botao_salvar)
-        time.sleep(2)
-        
-        botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
-        navegador.execute_script("arguments[0].click();", botao_sim)
-        time.sleep(3)
-        
-        # Leitor de erros pop-up (se a data estiver bloqueada, por exemplo)
-        erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
-        if erro_swal and erro_swal[0].is_displayed():
-            titulo_erro = navegador.find_element(By.ID, "swal2-title").text
-            navegador.execute_script("arguments[0].click();", navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]"))
-            raise Exception(f"Sistema recusou salvar: {titulo_erro}")
+        try:
+            botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Salvar')]")))
+            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
+            time.sleep(1)
+            navegador.execute_script("arguments[0].click();", botao_salvar)
+            time.sleep(2)
+            
+            try:
+                botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
+                navegador.execute_script("arguments[0].click();", botao_sim)
+                time.sleep(3)
+            except: pass
+        except: pass
+            
+        # Leitor de erros pop-up (se a data estiver bloqueada ou tela vazia)
+        try:
+            erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
+            if erro_swal and erro_swal[0].is_displayed():
+                titulo_erro = navegador.find_element(By.ID, "swal2-title").text
+                navegador.execute_script("arguments[0].click();", navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]"))
+                raise Exception(f"Sistema recusou salvar: {titulo_erro}")
+        except Exception as e_swal:
+            if "Sistema recusou salvar" in str(e_swal): raise e_swal
             
     except Exception as e: 
-        raise Exception(f"Falha ao lançar: {e}")
+        raise Exception(f"{e}")
 
 # ================= FUNÇÃO DE NOTAS =================
 def lancar_notas(navegador, wait, nota_info):
@@ -432,7 +444,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V35 (FALTAS 100% EXPOSTAS E AULAS VAZIAS REMOVIDAS)")
+    print(" 🚀 VERSÃO DO VIGIA: V36 (RESET DE CACHE ENTRE FALTAS)")
     print("="*60)
     
     try:
@@ -475,7 +487,6 @@ def vigiar():
                 for i in range(min(len(cabecalhos), len(row))):
                     linha_dict[cabecalhos[i]] = row[i]
                 
-                # 🔥 A CORREÇÃO: Ignora linhas que o Google Sheets mandou mas não têm data 🔥
                 data_aula_planilha = str(linha_dict.get("Data", row[0] if len(row)>0 else "")).strip()
                 if not data_aula_planilha: continue
                 
@@ -721,7 +732,7 @@ def vigiar():
                             relatorio_telegram += "  ✅ Faltas gravadas.\n"
                         except Exception as e_falta:
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
-                            print(f"   [Faltas] ❌ {str(e_falta)[:80]}")
+                            print(f"   [Faltas] ❌ Erro: {str(e_falta)[:80]}")
                             relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:80]}\n"
 
                 except Exception as erro_abrir_painel:
