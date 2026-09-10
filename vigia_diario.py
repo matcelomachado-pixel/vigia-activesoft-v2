@@ -168,8 +168,7 @@ def lancar_ocorrencias(navegador, wait, aula):
         except: pass
 
 def lancar_faltas(navegador, wait, aula, etapa_atual):
-    # 🔥 AQUI ESTÁ A CORREÇÃO: O Vigia agora avalia SOMENTE a coluna Status_Falta 🔥
-    if aula['status_falta'] != "Pendente_Nova": 
+    if aula['tipo_lancamento'] != "Pendente_Nova": 
         return
         
     faltas_str = str(aula.get('faltas', '')).strip()
@@ -429,7 +428,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V33 (STATUS DESACOPLADOS CORRIGIDO)")
+    print(" 🚀 VERSÃO DO VIGIA: V34 (LEITOR FORÇADO DE COLUNAS)")
     print("="*60)
     
     try:
@@ -454,18 +453,32 @@ def vigiar():
             if len(dados_brutos) < 2: continue
             
             cabecalhos = [str(c).strip() for c in dados_brutos[0]]
-            col_diario = next((i + 1 for i, c in enumerate(cabecalhos) if "DIARIO" in c.upper() or "DIÁRIO" in c.upper() or c.upper() == "STATUS"), 9)
-            col_ocorrencia = next((i + 1 for i, c in enumerate(cabecalhos) if "OCORRENCIA" in c.upper() or "OCORRÊNCIA" in c.upper()), col_diario + 1)
-            col_falta = next((i + 1 for i, c in enumerate(cabecalhos) if "FALTA" in c.upper()), col_diario + 2)
+            
+            # 🔥 LEITOR FORÇADO DE COLUNAS 🔥
+            # Padrão: 9 = Diario, 10 = Ocorrencia, 11 = Falta
+            col_diario = 9
+            col_ocorrencia = 10
+            col_falta = 11
+            
+            # Tenta achar pelo nome, se falhar ou se as colunas forem novas demais para a API ler o nome, usa as posições padrão.
+            for i, c in enumerate(cabecalhos):
+                if "DIARIO" in c.upper() or "DIÁRIO" in c.upper() or c.upper() == "STATUS": col_diario = i + 1
+                if "OCORRENCIA" in c.upper() or "OCORRÊNCIA" in c.upper(): col_ocorrencia = i + 1
+                if "FALTA" in c.upper(): col_falta = i + 1
             
             for indice, row in enumerate(dados_brutos[1:]):
                 linha_sheets = indice + 2 
-                while len(row) < len(cabecalhos): row.append("")
-                linha_dict = {cabecalhos[i]: row[i] for i in range(len(cabecalhos))}
+                # Preenche a linha com espaços vazios caso a API do Google não baixe as últimas colunas criadas
+                while len(row) < 15: row.append("") 
                 
-                st_diario = str(row[col_diario - 1]).strip() if len(row) >= col_diario else ""
-                st_ocor = str(row[col_ocorrencia - 1]).strip() if len(row) >= col_ocorrencia else ""
-                st_falta = str(row[col_falta - 1]).strip() if len(row) >= col_falta else ""
+                # Resumo das informações básicas das colunas 1 a 8
+                linha_dict = {}
+                for i in range(min(len(cabecalhos), len(row))):
+                    linha_dict[cabecalhos[i]] = row[i]
+                
+                st_diario = str(row[col_diario - 1]).strip()
+                st_ocor = str(row[col_ocorrencia - 1]).strip()
+                st_falta = str(row[col_falta - 1]).strip()
                 
                 if "Pendente" in st_diario or "Pendente" in st_ocor or "Pendente" in st_falta:
                     aulas_pendentes.append({
@@ -473,10 +486,14 @@ def vigiar():
                         "col_status_diario": col_diario, "status_diario": st_diario,
                         "col_status_ocorrencia": col_ocorrencia, "status_ocorrencia": st_ocor,
                         "col_status_falta": col_falta, "status_falta": st_falta,
-                        "turma": turma_nome, "data": str(linha_dict.get("Data", "")).strip(),
-                        "resumo": str(linha_dict.get("Resumo", "")).strip(), "para_casa": str(linha_dict.get("Para Casa", "")).strip(),
-                        "nao_fez": str(linha_dict.get("Nao_Fez", "")).strip(), "tarefa_nao_feita": str(linha_dict.get("Tarefa_Nao_Feita", "")).strip(),
-                        "faltas": str(linha_dict.get("Faltas", "")).strip(), "tipo_lancamento": st_diario
+                        "turma": turma_nome, 
+                        "data": str(linha_dict.get("Data", row[0] if len(row)>0 else "")).strip(),
+                        "resumo": str(linha_dict.get("Resumo", row[1] if len(row)>1 else "")).strip(), 
+                        "para_casa": str(linha_dict.get("Para Casa", row[2] if len(row)>2 else "")).strip(),
+                        "nao_fez": str(linha_dict.get("Nao_Fez", row[4] if len(row)>4 else "")).strip(), 
+                        "tarefa_nao_feita": str(linha_dict.get("Tarefa_Nao_Feita", row[5] if len(row)>5 else "")).strip(),
+                        "faltas": str(linha_dict.get("Faltas", row[3] if len(row)>3 else "")).strip(), 
+                        "tipo_lancamento": st_diario
                     })
 
         abas_notas = [aba for aba in planilha.worksheets() if aba.title.startswith("Notas_")]
@@ -535,8 +552,6 @@ def vigiar():
                     time.sleep(3)
                     
                     try: navegador.switch_to.alert.accept()
-                    except: pass
-                    try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
                     except: pass
 
                     try:
@@ -724,8 +739,6 @@ def vigiar():
                     time.sleep(3)
                     
                     try: navegador.switch_to.alert.accept()
-                    except: pass
-                    try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
                     except: pass
 
                     wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']"))).click()
