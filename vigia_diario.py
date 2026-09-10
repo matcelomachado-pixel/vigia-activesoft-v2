@@ -60,7 +60,7 @@ def conectar_sheets():
     client = gspread.authorize(creds)
     return client.open_by_key(SPREADSHEET_ID)
 
-# ================= RESTAURADO: FUNÇÕES ORIGINAIS DO DIÁRIO =================
+# ================= FUNÇÕES DO DIÁRIO =================
 def lancar_ocorrencias(navegador, wait, aula):
     if not str(aula.get('nao_fez', '')).strip(): return
     try:
@@ -168,9 +168,8 @@ def lancar_ocorrencias(navegador, wait, aula):
         except: pass
 
 def lancar_faltas(navegador, wait, aula, etapa_atual):
-    if aula['tipo_lancamento'] != "Pendente_Nova": 
-        return
-        
+    # 🔥 A TRAVA ANTIGA FOI REMOVIDA DAQUI 🔥
+    # O bot obedece exclusivamente à coluna Status_Falta
     faltas_str = str(aula.get('faltas', '')).strip()
 
     try:
@@ -318,7 +317,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
     except Exception as e: 
         raise Exception(f"Erro na digitação de faltas: {e}")
 
-# ================= RESTAURADO: FUNÇÃO DE NOTAS =================
+# ================= FUNÇÃO DE NOTAS =================
 def lancar_notas(navegador, wait, nota_info):
     input_escondido = None
     for tentativa in range(12):
@@ -428,7 +427,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V31 (LÓGICA ORIGINAL RESTAURADA)")
+    print(" 🚀 VERSÃO DO VIGIA: V32 (STATUS 100% INDEPENDENTES)")
     print("="*60)
     
     try:
@@ -535,8 +534,6 @@ def vigiar():
                     
                     try: navegador.switch_to.alert.accept()
                     except: pass
-                    try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
-                    except: pass
 
                     try:
                         botao_exibir = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']")))
@@ -553,6 +550,8 @@ def vigiar():
                     except Exception: raise Exception(f"Turma '{turma_site}' não foi achada na tela.")
                     
                     time.sleep(5) 
+                    
+                    # 🔥 LÓGICA DE AVALIAÇÃO INDEPENDENTE 🔥
                     
                     if aula['status_diario'] in ["Pendente", "Pendente_Nova"]:
                         try:
@@ -586,7 +585,6 @@ def vigiar():
                                 if frames: navegador.switch_to.frame(frames[0])
                             except: pass
                             
-                            # ================= RESTAURADO: BLOCO ORIGINAL DE ESCRITA DE DIÁRIO =================
                             if aula['status_diario'] == "Pendente_Nova":
                                 campo_data_nova = wait.until(EC.element_to_be_clickable((By.ID, "DataAulaNovo")))
                                 campo_data_nova.click()
@@ -652,7 +650,6 @@ def vigiar():
                                 
                                 botao_gravar = linha_alvo.find_element(By.XPATH, ".//a[contains(text(), 'Gravar')] | .//button[contains(text(), 'Gravar')] | .//input[@value='Gravar']")
                                 navegador.execute_script("arguments[0].click();", botao_gravar)
-                            # ================= FIM DO BLOCO RESTAURADO =================
                                 
                             time.sleep(3)
                             
@@ -685,6 +682,7 @@ def vigiar():
                             print(f"   [Diário] ❌ Erro: {str(e_diario)[:80]}")
                             relatorio_telegram += f"  ❌ Erro Diário: {str(e_diario)[:80]}\n"
 
+                    # 🔥 OCORRÊNCIAS: O bot agora só usa "Pendente", não importa a aula
                     if aula['status_ocorrencia'] in ["Pendente", "Pendente_Nova"]:
                         try:
                             lancar_ocorrencias(navegador, wait, aula)
@@ -696,6 +694,7 @@ def vigiar():
                             print(f"   [Ocorrências] ❌ Erro: {str(e_ocor)[:80]}")
                             relatorio_telegram += f"  ❌ Erro Ocorrências: {str(e_ocor)[:80]}\n"
 
+                    # 🔥 FALTAS: O bot manda "Pendente_Nova" para lançar e "Lançado" para ignorar
                     if aula['status_falta'] in ["Pendente", "Pendente_Nova"]:
                         try:
                             lancar_faltas(navegador, wait, aula, ETAPA_ATUAL)
@@ -725,8 +724,6 @@ def vigiar():
                     time.sleep(3)
                     
                     try: navegador.switch_to.alert.accept()
-                    except: pass
-                    try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
                     except: pass
 
                     wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']"))).click()
