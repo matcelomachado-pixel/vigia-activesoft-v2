@@ -36,34 +36,52 @@ MAPA_TURMAS = {
 
 SPREADSHEET_ID = '1oLo2lYbgqOgyT5Kd02pUAZ0EYWCGqLY0H1rks0aHwX4'
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-JS_REACT_SETTER = "let e=arguments[0],v=arguments[1],s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(e,v);e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));"
+
+JS_REACT_SETTER = """
+    let elemento = arguments[0];
+    let valor = arguments[1];
+    let setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(elemento, valor);
+    elemento.dispatchEvent(new Event('input', { bubbles: true }));
+    elemento.dispatchEvent(new Event('change', { bubbles: true }));
+"""
 
 def avisar_telegram(mensagem):
-    token, chat_id = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
-    if token and chat_id:
-        try: requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": mensagem, "parse_mode": "HTML"}, timeout=10)
-        except: pass
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id: return
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": mensagem, "parse_mode": "HTML"}
+    try: requests.post(url, json=payload, timeout=10)
+    except: pass
 
 def conectar_sheets():
     creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", SCOPE) 
-    return gspread.authorize(creds).open_by_key(SPREADSHEET_ID)
+    client = gspread.authorize(creds)
+    return client.open_by_key(SPREADSHEET_ID)
 
-# ================= FUNÇÕES DO DIÁRIO =================
+# ================= RESTAURADO: FUNÇÕES ORIGINAIS DO DIÁRIO =================
 def lancar_ocorrencias(navegador, wait, aula):
     if not str(aula.get('nao_fez', '')).strip(): return
     try:
         texto_ocorrencia = f"Não fez a tarefa: {aula['tarefa_nao_feita']}"
         numeros_alvo = [num.strip() for num in aula['nao_fez'].split(',')]
-        
         try: navegador.switch_to.default_content()
         except: pass
         time.sleep(2)
         
-        wait.until(EC.element_to_be_clickable((By.ID, "ocorrencias_de_alunos"))).click()
+        botao_ocorrencias = wait.until(EC.element_to_be_clickable((By.ID, "ocorrencias_de_alunos")))
+        navegador.execute_script("arguments[0].click();", botao_ocorrencias)
         time.sleep(3)
-        wait.until(EC.element_to_be_clickable((By.XPATH, "//a[@href='/gerar_ocorrencias_lote/' or contains(text(), 'Registrar ocorrência')]"))).click()
+
+        xpath_registrar = "//a[@href='/gerar_ocorrencias_lote/' or contains(text(), 'Registrar ocorrência')]"
+        botao_registrar = wait.until(EC.element_to_be_clickable((By.XPATH, xpath_registrar)))
+        navegador.execute_script("arguments[0].click();", botao_registrar)
         time.sleep(3)
-        wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Pesquisar']"))).click()
+
+        xpath_pesquisar = "//button[normalize-space(text())='Pesquisar']"
+        botao_pesquisar = wait.until(EC.element_to_be_clickable((By.XPATH, xpath_pesquisar)))
+        navegador.execute_script("arguments[0].click();", botao_pesquisar)
         time.sleep(5) 
         
         nome_plan = aula['turma'].upper().strip()
@@ -71,28 +89,46 @@ def lancar_ocorrencias(navegador, wait, aula):
         letra_t = "A" if nome_plan.endswith("A") else "B" if nome_plan.endswith("B") else ""
 
         for num in numeros_alvo:
-            linhas = navegador.find_elements(By.XPATH, f"//tr[td[normalize-space(text())='{num}']]")
-            for linha in linhas:
-                texto_turma = ""
-                for td in linha.find_elements(By.TAG_NAME, "td"):
-                    if "/" in td.text and ("ANO" in td.text.upper() or "SÉRIE" in td.text.upper() or "SERIE" in td.text.upper()):
-                        texto_turma = td.text.upper().strip(); break
-                if not texto_turma: texto_turma = linha.text.upper().strip()
-                
-                if num_t in texto_turma and (letra_t in texto_turma if letra_t else "SÉRIE" in texto_turma or "SERIE" in texto_turma):
-                    checkbox = linha.find_element(By.XPATH, ".//input[@type='checkbox']")
-                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", checkbox)
-                    time.sleep(0.5)
-                    if not checkbox.is_selected(): navegador.execute_script("arguments[0].click();", checkbox)
-                    break 
+            try:
+                linhas = navegador.find_elements(By.XPATH, f"//tr[td[normalize-space(text())='{num}']]")
+                clicado = False
+                for linha in linhas:
+                    texto_turma = ""
+                    for td in linha.find_elements(By.TAG_NAME, "td"):
+                        if "/" in td.text and ("ANO" in td.text.upper() or "SÉRIE" in td.text.upper() or "SERIE" in td.text.upper()):
+                            texto_turma = td.text.upper().strip()
+                            break
+                    if not texto_turma: texto_turma = linha.text.upper().strip()
+                    
+                    if num_t in texto_turma:
+                        match = False
+                        if letra_t: 
+                            if texto_turma.endswith(letra_t): match = True
+                        else: 
+                            if "SÉRIE" in texto_turma or "SERIE" in texto_turma: match = True
+                                
+                        if match:
+                            checkbox = linha.find_element(By.XPATH, ".//input[@type='checkbox']")
+                            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", checkbox)
+                            time.sleep(0.5)
+                            if not checkbox.is_selected():
+                                navegador.execute_script("arguments[0].click();", checkbox)
+                            clicado = True
+                            break 
+            except: pass
 
-        wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Próximo')]"))).click()
+        xpath_proximo = "//button[contains(., 'Próximo')]"
+        botao_proximo = wait.until(EC.element_to_be_clickable((By.XPATH, xpath_proximo)))
+        navegador.execute_script("arguments[0].click();", botao_proximo)
         time.sleep(3)
 
         try:
             input_data = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@placeholder='DD/MM/AAAA']")))
             input_data.click()
-            input_data.send_keys(Keys.CONTROL + "a", Keys.BACKSPACE, aula['data'], Keys.ESCAPE)
+            input_data.send_keys(Keys.CONTROL + "a")
+            input_data.send_keys(Keys.BACKSPACE)
+            input_data.send_keys(aula['data'])
+            input_data.send_keys(Keys.ESCAPE)
             time.sleep(0.5)
         except: pass
 
@@ -106,18 +142,25 @@ def lancar_ocorrencias(navegador, wait, aula):
 
         try:
             botao_internet = navegador.find_element(By.XPATH, "//button[@label='Exibir esta observação na Internet']")
+            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_internet)
             navegador.execute_script("arguments[0].click();", botao_internet)
         except: pass
 
-        navegador.find_element(By.XPATH, "//textarea[contains(@class, 'form-control')]").send_keys(texto_ocorrencia)
-
-        botao_executar = navegador.find_element(By.XPATH, "//button[contains(text(), 'Executar')]")
-        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_executar)
-        time.sleep(1)
-        navegador.execute_script("arguments[0].click();", botao_executar)
-        try: wait.until(EC.alert_is_present()).accept()
+        try:
+            caixa_obs = navegador.find_element(By.XPATH, "//textarea[contains(@class, 'form-control')]")
+            caixa_obs.clear()
+            caixa_obs.send_keys(texto_ocorrencia)
         except: pass
-        
+
+        try:
+            botao_executar = navegador.find_element(By.XPATH, "//button[contains(text(), 'Executar')]")
+            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_executar)
+            time.sleep(1)
+            navegador.execute_script("arguments[0].click();", botao_executar)
+            try: wait.until(EC.alert_is_present()).accept()
+            except: pass
+        except: pass
+
     except Exception as e:
         raise Exception(f"Erro no preenchimento das ocorrências: {e}")
     finally:
@@ -126,7 +169,7 @@ def lancar_ocorrencias(navegador, wait, aula):
 
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": 
-        return 
+        return
         
     faltas_str = str(aula.get('faltas', '')).strip()
 
@@ -135,49 +178,73 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         except: pass
         time.sleep(2)
         
-        try: wait.until(EC.element_to_be_clickable((By.ID, "frequencia_em_lote"))).click()
-        except: navegador.get("https://siga02.activesoft.com.br/diarios/frequencia_em_lote/")
+        try:
+            botao_freq = wait.until(EC.element_to_be_clickable((By.ID, "frequencia_em_lote")))
+            navegador.execute_script("arguments[0].click();", botao_freq)
+        except:
+            navegador.get("https://siga02.activesoft.com.br/diarios/frequencia_em_lote/")
         time.sleep(5)
         
         turma_bruta = aula['turma'].upper()
         curso = "FUNDAMENTAL" if "ANO" in turma_bruta else "MÉDIO"
-        serie_busca = next((s for s in ["6", "7", "8", "9"] if s in turma_bruta), next((s for s in ["1", "2", "3"] if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta), ""))
+        
+        serie_busca = ""
+        for s in ["6", "7", "8", "9"]:
+            if s in turma_bruta: serie_busca = s 
+        for s in ["1", "2", "3"]:
+            if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta: serie_busca = s
+            
         turma_exata = turma_bruta.replace("º", "°")
         
         def preencher_select_blindado(idx, texto):
-            navegador.switch_to.default_content()
-            inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
-            if not inps: 
-                frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
-                for f in frames:
-                    navegador.switch_to.default_content()
+            try:
+                navegador.switch_to.default_content()
+                inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+                if not inps: 
+                    frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
+                    for f in frames:
+                        navegador.switch_to.default_content()
+                        try:
+                            navegador.switch_to.frame(f)
+                            inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+                            if inps: break
+                        except: pass
+                if idx >= len(inps): return
+                inp = inps[idx]
+                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
+                time.sleep(1)
+                try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
+                except: pass
+                time.sleep(1)
+                navegador.execute_script("arguments[0].focus();", inp)
+                try:
+                    inp.send_keys(Keys.CONTROL + "a")
+                    inp.send_keys(Keys.BACKSPACE)
+                    inp.send_keys(texto)
+                    time.sleep(1.5)
+                except:
+                    navegador.execute_script(JS_REACT_SETTER, inp, texto)
+                    time.sleep(2)
+                opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')]")
+                if opcoes:
+                    clicou_exato = False
+                    for opcao in opcoes:
+                        if texto.upper() == opcao.text.strip().upper():
+                            navegador.execute_script("arguments[0].click();", opcao)
+                            clicou_exato = True
+                            break
+                    if not clicou_exato: navegador.execute_script("arguments[0].click();", opcoes[-1])
+                else:
                     try:
-                        navegador.switch_to.frame(f)
-                        inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
-                        if inps: break
-                    except: pass
-            if not inps: raise Exception("Painel de faltas não carregou os campos.")
-            if idx >= len(inps): return
-            inp = inps[idx]
-            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
-            time.sleep(1)
-            try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
+                        inp.send_keys(Keys.ARROW_DOWN)
+                        time.sleep(0.5)
+                        inp.send_keys(Keys.ENTER)
+                    except:
+                        navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
+                        time.sleep(0.5)
+                        navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
+                time.sleep(2.5) 
             except: pass
-            time.sleep(1)
-            navegador.execute_script("arguments[0].focus();", inp)
-            try: inp.send_keys(Keys.CONTROL + "a", Keys.BACKSPACE, texto); time.sleep(1.5)
-            except: navegador.execute_script(JS_REACT_SETTER, inp, texto); time.sleep(2)
-            
-            opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')]")
-            if opcoes:
-                for opcao in opcoes:
-                    if texto.upper() == opcao.text.strip().upper():
-                        navegador.execute_script("arguments[0].click();", opcao); break
-            else:
-                navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
-                time.sleep(0.5)
-                navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
-            time.sleep(2.5) 
 
         preencher_select_blindado(1, curso)        
         preencher_select_blindado(2, serie_busca)       
@@ -186,13 +253,17 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         
         try:
             inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
-            for input_dt in inps_data[:2]:
-                navegador.execute_script(JS_REACT_SETTER, input_dt, aula['data']); time.sleep(0.5)
+            if inps_data:
+                for input_dt in inps_data[:2]:
+                    navegador.execute_script(JS_REACT_SETTER, input_dt, aula['data'])
+                    time.sleep(0.5)
         except: pass
 
-        botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
-        navegador.execute_script("arguments[0].click();", botao_consultar)
-        time.sleep(8) 
+        try:
+            botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
+            navegador.execute_script("arguments[0].click();", botao_consultar)
+            time.sleep(8) 
+        except: pass
         
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
@@ -200,38 +271,54 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             try: botao_alvo.click() 
             except: navegador.execute_script("arguments[0].click();", botao_alvo) 
             time.sleep(1) 
-            opcoes = navegador.find_elements(By.XPATH, f"//*[normalize-space(text())='{texto_opcao}']")
+            xpath = f"//*[normalize-space(text())='{texto_opcao}']"
+            opcoes = navegador.find_elements(By.XPATH, xpath)
             for op in opcoes:
                 if op.is_displayed():
-                    try: op.click(); return
-                    except: webdriver.ActionChains(navegador).move_to_element(op).click().perform(); return
+                    try:
+                        op.click() 
+                        return
+                    except:
+                        webdriver.ActionChains(navegador).move_to_element(op).click().perform()
+                        return
             if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
 
-        botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
-        clicar_opcao_tabela(botao_selecione, "Presente")
-        time.sleep(3) 
+        try:
+            botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
+            clicar_opcao_tabela(botao_selecione, "Presente")
+            time.sleep(3) 
+        except: pass
             
         if faltas_str:
-            for num in [n.strip() for n in faltas_str.split(',')]:
-                linha = navegador.find_element(By.XPATH, f"(//tbody/tr)[{int(num) + 1}]")
-                botao_status = linha.find_element(By.XPATH, ".//button[contains(@class, 'Toggle__ToggleButton')]")
-                clicar_opcao_tabela(botao_status, "Falta")
-                time.sleep(1)
-        
-        botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Salvar')]")))
-        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", botao_salvar)
-        time.sleep(2)
+            numeros_falta = [n.strip() for n in faltas_str.split(',')]
+            for num in numeros_falta:
+                try:
+                    indice_linha = int(num) + 1 
+                    xpath_linha = f"(//tbody/tr)[{indice_linha}]"
+                    linha = navegador.find_element(By.XPATH, xpath_linha)
+                    botao_status = linha.find_element(By.XPATH, ".//button[contains(@class, 'Toggle__ToggleButton')]")
+                    clicar_opcao_tabela(botao_status, "Falta")
+                    time.sleep(1)
+                except: pass
         
         try:
-            botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
-            navegador.execute_script("arguments[0].click();", botao_sim)
-            time.sleep(3)
+            botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Salvar')]")))
+            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
+            time.sleep(1)
+            navegador.execute_script("arguments[0].click();", botao_salvar)
+            time.sleep(2)
+            
+            try:
+                botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
+                navegador.execute_script("arguments[0].click();", botao_sim)
+                time.sleep(3)
+            except: pass
         except: pass
             
     except Exception as e: 
         raise Exception(f"Erro na digitação de faltas: {e}")
 
-# ================= MÓDULO DE NOTAS =================
+# ================= RESTAURADO: FUNÇÃO DE NOTAS =================
 def lancar_notas(navegador, wait, nota_info):
     input_escondido = None
     for tentativa in range(12):
@@ -243,75 +330,105 @@ def lancar_notas(navegador, wait, nota_info):
         frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
         for f in frames:
             navegador.switch_to.default_content()
-            try: navegador.switch_to.frame(f); input_escondido = navegador.find_element(By.XPATH, "//input[contains(@id, 'react-select')]")
+            try:
+                navegador.switch_to.frame(f)
+                input_escondido = navegador.find_element(By.XPATH, "//input[contains(@id, 'react-select')]")
+                if input_escondido: break
             except: pass
-            if input_escondido: break
         if input_escondido: break
         time.sleep(1.5)
         
     if not input_escondido: raise Exception("Campo de Etapa sumiu.")
 
-    navegador.execute_script("arguments[0].parentNode.parentNode.click();", input_escondido)
-    time.sleep(1)
-    navegador.execute_script("arguments[0].focus();", input_escondido)
-    input_escondido.send_keys(nota_info['etapa'])
-    time.sleep(1.5) 
-    
-    opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{nota_info['etapa']}']")
-    if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
-    else:
-        navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", input_escondido)
-        time.sleep(0.5)
-        navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", input_escondido)
-    time.sleep(1.5)
-    
-    wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Consultar')]"))).click()
-    time.sleep(3) 
+    try:
+        navegador.execute_script("arguments[0].parentNode.parentNode.click();", input_escondido)
+        time.sleep(1)
+        navegador.execute_script("arguments[0].focus();", input_escondido)
+        input_escondido.send_keys(nota_info['etapa'])
+        time.sleep(1.5) 
+        
+        opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{nota_info['etapa']}']")
+        if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
+        else:
+            navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", input_escondido)
+            time.sleep(0.5)
+            navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", input_escondido)
+        time.sleep(1.5)
+        
+        btn_consultar = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Consultar')]")))
+        navegador.execute_script("arguments[0].click();", btn_consultar) 
+        time.sleep(3) 
 
-    wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Inserir avaliação')] | //*[name()='svg' and contains(@class, 'FaseNota')]"))).click()
-    time.sleep(1.5)
-    wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(text(), 'Nova avaliação')]"))).click()
-    time.sleep(1.5) 
-    
-    navegador.execute_script(JS_REACT_SETTER, wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'Input-sg8yoa-0') and not(@readonly)]"))), nota_info['nome_prova'])
-    time.sleep(0.5)
-    navegador.execute_script(JS_REACT_SETTER, wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'Datepicker')]"))), nota_info['data_prova'])
-    time.sleep(0.5)
-    navegador.execute_script(JS_REACT_SETTER, wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'InputDecimal')]"))), nota_info['valor_prova'])
-    time.sleep(0.5)
-    
-    wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Salvar')]"))).click()
-    navegador.execute_script("arguments[0].click();", WebDriverWait(navegador, 10).until(EC.presence_of_element_located((By.XPATH, "//button[contains(@class, 'swal2-confirm') or text()='Fechar']"))))
-    time.sleep(3)
-    
-    cabecalhos_provas = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//div[contains(@class, 'TextClick')]")))
-    indice_coluna_alvo = next((i for i, cab in enumerate(cabecalhos_provas) if cab.text.strip() == nota_info['nome_prova']), len(cabecalhos_provas) - 1)
-    
-    for num_aluno, nota in nota_info['notas_alunos'].items():
-        try:
-            linha_aluno = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[text()='{num_aluno}']/ancestor::tr")))
-            todas_as_caixas = linha_aluno.find_elements(By.XPATH, ".//input[contains(@class, 'InputNotaStyled')]")
-            if len(todas_as_caixas) > indice_coluna_alvo:
-                input_nota_certo = todas_as_caixas[indice_coluna_alvo]
-                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_nota_certo)
-                time.sleep(0.2)
+        btn_inserir = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Inserir avaliação')] | //*[name()='svg' and contains(@class, 'FaseNota')]")))
+        navegador.execute_script("arguments[0].click();", btn_inserir)
+        time.sleep(1.5)
+
+        btn_nova = wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(text(), 'Nova avaliação')]")))
+        navegador.execute_script("arguments[0].click();", btn_nova)
+        time.sleep(1.5) 
+        
+        input_nome = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'Input-sg8yoa-0') and not(@readonly)]")))
+        navegador.execute_script(JS_REACT_SETTER, input_nome, nota_info['nome_prova'])
+        time.sleep(0.5)
+        
+        input_data = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'Datepicker')]")))
+        navegador.execute_script(JS_REACT_SETTER, input_data, nota_info['data_prova'])
+        time.sleep(0.5)
+        
+        input_valor = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'InputDecimal')]")))
+        navegador.execute_script(JS_REACT_SETTER, input_valor, nota_info['valor_prova'])
+        time.sleep(0.5)
+        
+        btn_salvar = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Salvar')]")))
+        navegador.execute_script("arguments[0].click();", btn_salvar)
+        
+        wait_modal = WebDriverWait(navegador, 10)
+        btn_fechar = wait_modal.until(EC.presence_of_element_located((By.XPATH, "//button[contains(@class, 'swal2-confirm') or text()='Fechar']")))
+        navegador.execute_script("arguments[0].click();", btn_fechar)
+        time.sleep(3)
+        
+        cabecalhos_provas = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//div[contains(@class, 'TextClick')]")))
+        
+        indice_coluna_alvo = -1
+        for i, cabecalho in enumerate(cabecalhos_provas):
+            if cabecalho.text.strip() == nota_info['nome_prova']:
+                indice_coluna_alvo = i
+                break
                 
-                if str(nota).strip() in ["0", "0.0", "0,0"]:
-                    try: input_nota_certo.click(); input_nota_certo.send_keys(Keys.BACKSPACE, "0,0") 
-                    except: navegador.execute_script(JS_REACT_SETTER, input_nota_certo, "0,0")
-                else:
-                    navegador.execute_script(JS_REACT_SETTER, input_nota_certo, nota)
+        if indice_coluna_alvo == -1: indice_coluna_alvo = len(cabecalhos_provas) - 1 
+        
+        for num_aluno, nota in nota_info['notas_alunos'].items():
+            try:
+                linha_aluno = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[text()='{num_aluno}']/ancestor::tr")))
+                todas_as_caixas = linha_aluno.find_elements(By.XPATH, ".//input[contains(@class, 'InputNotaStyled')]")
+                if len(todas_as_caixas) > indice_coluna_alvo:
+                    input_nota_certo = todas_as_caixas[indice_coluna_alvo]
                     
-                time.sleep(0.2)
-                input_nota_certo.send_keys(Keys.TAB)
-                time.sleep(0.5)
-        except Exception: pass
+                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_nota_certo)
+                    time.sleep(0.2)
+                    
+                    if str(nota).strip() in ["0", "0.0", "0,0"]:
+                        try:
+                            input_nota_certo.click()
+                            input_nota_certo.send_keys(Keys.BACKSPACE)
+                            input_nota_certo.send_keys("0,0") 
+                        except:
+                            navegador.execute_script(JS_REACT_SETTER, input_nota_certo, "0,0")
+                    else:
+                        navegador.execute_script(JS_REACT_SETTER, input_nota_certo, nota)
+                        
+                    time.sleep(0.2)
+                    input_nota_certo.send_keys(Keys.TAB)
+                    time.sleep(0.5)
+            except: pass
+    except Exception as e:
+        raise e
 
 # ================= MOTOR CENTRAL =================
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V30 (LIMPADOR DE PÁRA-BRISA ATIVADO)")
+    print(" 🚀 VERSÃO DO VIGIA: V31 (LÓGICA ORIGINAL RESTAURADA)")
     print("="*60)
     
     try:
@@ -403,6 +520,8 @@ def vigiar():
             navegador.find_element(By.XPATH, "//input[@type='password']").send_keys(MINHA_SENHA)
             navegador.find_element(By.XPATH, "//button[contains(text(), 'Entrar') or @data-cy='botao-login']").click()
             time.sleep(3)
+            try: WebDriverWait(navegador, 3).until(EC.element_to_be_clickable((By.XPATH, "//img[@alt='Activesoft Logo']"))).click(); time.sleep(2)
+            except: pass 
             
             for aula in aulas_pendentes:
                 print(f"\n-> Iniciando {aula['turma']} ({aula['data']})")
@@ -414,7 +533,6 @@ def vigiar():
                     navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
                     time.sleep(3)
                     
-                    # 🔥 LIMPADOR DE PÁRA-BRISA (Fecha modais travados) 🔥
                     try: navegador.switch_to.alert.accept()
                     except: pass
                     try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
@@ -468,30 +586,73 @@ def vigiar():
                                 if frames: navegador.switch_to.frame(frames[0])
                             except: pass
                             
+                            # ================= RESTAURADO: BLOCO ORIGINAL DE ESCRITA DE DIÁRIO =================
                             if aula['status_diario'] == "Pendente_Nova":
-                                wait.until(EC.element_to_be_clickable((By.ID, "DataAulaNovo"))).send_keys(Keys.CONTROL + "a", Keys.BACKSPACE, aula['data'], Keys.ESCAPE, Keys.TAB)
-                                wait.until(EC.element_to_be_clickable((By.NAME, "ConteudoMinistradoNovo"))).send_keys(aula['resumo'])
-                                wait.until(EC.element_to_be_clickable((By.NAME, "TarefaNovo"))).send_keys(aula['para_casa'])
-                                botao_gravar = wait.until(EC.element_to_be_clickable((By.ID, "btnGravarNovo")))
-                                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", botao_gravar)
+                                campo_data_nova = wait.until(EC.element_to_be_clickable((By.ID, "DataAulaNovo")))
+                                campo_data_nova.click()
+                                campo_data_nova.send_keys(Keys.CONTROL + "a")
+                                campo_data_nova.send_keys(Keys.BACKSPACE)
+                                campo_data_nova.send_keys(aula['data'])
+                                time.sleep(0.5)
+                                campo_data_nova.send_keys(Keys.ESCAPE)
+                                campo_data_nova.send_keys(Keys.TAB)
+                                time.sleep(1)
+
+                                campo_conteudo = wait.until(EC.element_to_be_clickable((By.NAME, "ConteudoMinistradoNovo")))
+                                campo_conteudo.click()
+                                campo_conteudo.clear()
+                                campo_conteudo.send_keys(aula['resumo'])
+                                time.sleep(0.5)
+                                
+                                campo_tarefa = wait.until(EC.element_to_be_clickable((By.NAME, "TarefaNovo")))
+                                campo_tarefa.click()
+                                campo_tarefa.clear()
+                                campo_tarefa.send_keys(aula['para_casa'])
+                                time.sleep(1)
+
+                                botao_gravar_novo = wait.until(EC.element_to_be_clickable((By.ID, "btnGravarNovo")))
+                                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_gravar_novo)
+                                time.sleep(0.5)
+                                
+                                try: botao_gravar_novo.click()
+                                except: navegador.execute_script("arguments[0].click();", botao_gravar_novo)
+
                             else:
                                 data_busca = aula['data'].strip()[:5]
-                                botoes_editar = navegador.find_elements(By.XPATH, "//a[contains(text(), 'Editar') or contains(@title, 'Editar')] | //button[contains(text(), 'Editar')] | //input[@value='Editar']")
-                                botao_alvo, linha_alvo = None, None
+                                xpath_botoes = "//a[contains(text(), 'Editar') or contains(@title, 'Editar')] | //button[contains(text(), 'Editar')] | //input[@value='Editar']"
+                                botoes_editar = navegador.find_elements(By.XPATH, xpath_botoes)
+                                
+                                botao_alvo = None
+                                linha_alvo = None
                                 for botao in botoes_editar:
                                     linha = botao.find_element(By.XPATH, "./ancestor::tr[1]")
-                                    textos = " ".join([str(inp.get_attribute("value")) for inp in linha.find_elements(By.TAG_NAME, "input") if inp.get_attribute("value")])
-                                    if data_busca in (str(linha.text) + " " + textos):
-                                        botao_alvo, linha_alvo = botao, linha
+                                    textos_inputs = " ".join([str(inp.get_attribute("value")) for inp in linha.find_elements(By.TAG_NAME, "input") if inp.get_attribute("value")])
+                                    if data_busca in (str(linha.text) + " " + textos_inputs):
+                                        botao_alvo = botao
+                                        linha_alvo = linha
                                         break
-                                if not botao_alvo: raise Exception(f"Data {aula['data']} não localizada para edição.")
-                                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", botao_alvo)
+                                if not botao_alvo or not linha_alvo: raise Exception(f"Data {aula['data']} não localizada.")
+
+                                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", linha_alvo)
+                                time.sleep(1)
+                                navegador.execute_script("arguments[0].click();", botao_alvo)
                                 time.sleep(2) 
+
                                 caixas_texto = linha_alvo.find_elements(By.TAG_NAME, "textarea")
                                 if len(caixas_texto) >= 2:
-                                    caixas_texto[0].clear(); caixas_texto[0].send_keys(aula['resumo'], Keys.TAB)
-                                    caixas_texto[1].clear(); caixas_texto[1].send_keys(aula['para_casa'], Keys.TAB)
-                                navegador.execute_script("arguments[0].click();", linha_alvo.find_element(By.XPATH, ".//a[contains(text(), 'Gravar')] | .//button[contains(text(), 'Gravar')] | .//input[@value='Gravar']"))
+                                    caixas_texto[0].click(); caixas_texto[0].clear()
+                                    caixas_texto[0].send_keys(aula['resumo'])
+                                    caixas_texto[0].send_keys(Keys.TAB)
+                                    time.sleep(1)
+
+                                    caixas_texto[1].click(); caixas_texto[1].clear()
+                                    caixas_texto[1].send_keys(aula['para_casa'])
+                                    caixas_texto[1].send_keys(Keys.TAB)
+                                    time.sleep(1)
+                                
+                                botao_gravar = linha_alvo.find_element(By.XPATH, ".//a[contains(text(), 'Gravar')] | .//button[contains(text(), 'Gravar')] | .//input[@value='Gravar']")
+                                navegador.execute_script("arguments[0].click();", botao_gravar)
+                            # ================= FIM DO BLOCO RESTAURADO =================
                                 
                             time.sleep(3)
                             
