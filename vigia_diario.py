@@ -311,7 +311,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V29 (RECUPERAÇÃO DE LEITURA DE ERROS ATIVADA)")
+    print(" 🚀 VERSÃO DO VIGIA: V30 (LIMPADOR DE PÁRA-BRISA ATIVADO)")
     print("="*60)
     
     try:
@@ -403,8 +403,6 @@ def vigiar():
             navegador.find_element(By.XPATH, "//input[@type='password']").send_keys(MINHA_SENHA)
             navegador.find_element(By.XPATH, "//button[contains(text(), 'Entrar') or @data-cy='botao-login']").click()
             time.sleep(3)
-            try: WebDriverWait(navegador, 3).until(EC.element_to_be_clickable((By.XPATH, "//img[@alt='Activesoft Logo']"))).click(); time.sleep(2)
-            except: pass 
             
             for aula in aulas_pendentes:
                 print(f"\n-> Iniciando {aula['turma']} ({aula['data']})")
@@ -415,11 +413,27 @@ def vigiar():
                 try:
                     navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
                     time.sleep(3)
-                    wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']"))).click()
+                    
+                    # 🔥 LIMPADOR DE PÁRA-BRISA (Fecha modais travados) 🔥
+                    try: navegador.switch_to.alert.accept()
+                    except: pass
+                    try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
+                    except: pass
+
+                    try:
+                        botao_exibir = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']")))
+                        navegador.execute_script("arguments[0].click();", botao_exibir)
+                    except Exception: raise Exception("Botão 'Exibir' não carregou no painel inicial.")
+                    
                     time.sleep(5)
 
                     turma_site = MAPA_TURMAS.get(aula['turma'].upper().strip(), aula['turma'])
-                    WebDriverWait(navegador, 20).until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"))).click()
+                    try:
+                        xpath_turma = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"
+                        botao_diario = WebDriverWait(navegador, 15).until(EC.element_to_be_clickable((By.XPATH, xpath_turma)))
+                        navegador.execute_script("arguments[0].click();", botao_diario)
+                    except Exception: raise Exception(f"Turma '{turma_site}' não foi achada na tela.")
+                    
                     time.sleep(5) 
                     
                     if aula['status_diario'] in ["Pendente", "Pendente_Nova"]:
@@ -481,7 +495,6 @@ def vigiar():
                                 
                             time.sleep(3)
                             
-                            # 🔥 AQUI ESTÁ A RECUPERAÇÃO DA LEITURA DE ERROS 🔥
                             try: navegador.switch_to.alert.accept(); raise Exception("Alerta nativo de sistema do navegador.")
                             except Exception as e_a: 
                                 if "Alerta nativo" in str(e_a): raise e_a
@@ -504,27 +517,33 @@ def vigiar():
                                     raise Exception(f"Aviso na tela: {motivo.replace(chr(10), ' - ')}")
                                 
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Lançado")
+                            print("   [Diário] ✅ Gravado com sucesso.")
                             relatorio_telegram += "  ✅ Diário gravado.\n"
                         except Exception as e_diario:
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
+                            print(f"   [Diário] ❌ Erro: {str(e_diario)[:80]}")
                             relatorio_telegram += f"  ❌ Erro Diário: {str(e_diario)[:80]}\n"
 
                     if aula['status_ocorrencia'] in ["Pendente", "Pendente_Nova"]:
                         try:
                             lancar_ocorrencias(navegador, wait, aula)
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Lançado")
+                            print("   [Ocorrências] ✅ Gravadas com sucesso.")
                             relatorio_telegram += "  ✅ Ocorrências gravadas.\n"
                         except Exception as e_ocor:
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
+                            print(f"   [Ocorrências] ❌ Erro: {str(e_ocor)[:80]}")
                             relatorio_telegram += f"  ❌ Erro Ocorrências: {str(e_ocor)[:80]}\n"
 
                     if aula['status_falta'] in ["Pendente", "Pendente_Nova"]:
                         try:
                             lancar_faltas(navegador, wait, aula, ETAPA_ATUAL)
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Lançado")
+                            print("   [Faltas] ✅ Gravadas com sucesso.")
                             relatorio_telegram += "  ✅ Faltas gravadas.\n"
                         except Exception as e_falta:
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
+                            print(f"   [Faltas] ❌ Erro: {str(e_falta)[:80]}")
                             relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:80]}\n"
 
                 except Exception as erro_abrir_painel:
@@ -532,9 +551,10 @@ def vigiar():
                     if "Pendente" in aula['status_diario']: aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
                     if "Pendente" in aula['status_ocorrencia']: aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
                     if "Pendente" in aula['status_falta']: aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
-                    relatorio_telegram += "  🚨 Falha geral: Sistema indisponível ou turma não achada.\n"
+                    relatorio_telegram += "  🚨 Falha geral ao abrir a turma no painel.\n"
 
             for nota in notas_pendentes:
+                print(f"\n-> Iniciando Notas: {nota['nome_prova']} ({nota['turma']})")
                 relatorio_telegram += f"\n📝 <b>Notas: {nota['nome_prova']} ({nota['turma']})</b>\n"
                 try: navegador.switch_to.default_content()
                 except: pass
@@ -542,6 +562,12 @@ def vigiar():
                 try:
                     navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
                     time.sleep(3)
+                    
+                    try: navegador.switch_to.alert.accept()
+                    except: pass
+                    try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
+                    except: pass
+
                     wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']"))).click()
                     time.sleep(5)
 
@@ -551,10 +577,12 @@ def vigiar():
                     
                     lancar_notas(navegador, wait, nota)
                     nota['aba'].update_cell(2, nota['coluna_planilha'], "Lançado")
+                    print("   [Notas] ✅ Prova lançada com sucesso.")
                     relatorio_telegram += "  ✅ Prova lançada com sucesso.\n"
                     
                 except Exception as e_nota:
                     nota['aba'].update_cell(2, nota['coluna_planilha'], "Erro Sistema")
+                    print(f"   [Notas] ❌ Erro ao lançar: {str(e_nota)[:80]}")
                     relatorio_telegram += f"  ❌ Erro ao lançar: {str(e_nota)[:80]}\n"
 
         finally:
