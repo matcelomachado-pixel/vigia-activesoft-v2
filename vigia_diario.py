@@ -168,8 +168,10 @@ def lancar_ocorrencias(navegador, wait, aula):
         except: pass
 
 def lancar_faltas(navegador, wait, aula, etapa_atual):
-    # 🔥 A TRAVA ANTIGA FOI REMOVIDA DAQUI 🔥
-    # O bot obedece exclusivamente à coluna Status_Falta
+    # 🔥 AQUI ESTÁ A CORREÇÃO: O Vigia agora avalia SOMENTE a coluna Status_Falta 🔥
+    if aula['status_falta'] != "Pendente_Nova": 
+        return
+        
     faltas_str = str(aula.get('faltas', '')).strip()
 
     try:
@@ -427,7 +429,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V32 (STATUS 100% INDEPENDENTES)")
+    print(" 🚀 VERSÃO DO VIGIA: V33 (STATUS DESACOPLADOS CORRIGIDO)")
     print("="*60)
     
     try:
@@ -534,6 +536,8 @@ def vigiar():
                     
                     try: navegador.switch_to.alert.accept()
                     except: pass
+                    try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
+                    except: pass
 
                     try:
                         botao_exibir = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']")))
@@ -550,8 +554,6 @@ def vigiar():
                     except Exception: raise Exception(f"Turma '{turma_site}' não foi achada na tela.")
                     
                     time.sleep(5) 
-                    
-                    # 🔥 LÓGICA DE AVALIAÇÃO INDEPENDENTE 🔥
                     
                     if aula['status_diario'] in ["Pendente", "Pendente_Nova"]:
                         try:
@@ -629,7 +631,7 @@ def vigiar():
                                         botao_alvo = botao
                                         linha_alvo = linha
                                         break
-                                if not botao_alvo or not linha_alvo: raise Exception(f"Data {aula['data']} não localizada.")
+                                if not botao_alvo or not linha_alvo: raise Exception(f"Data {aula['data']} não localizada para edição.")
 
                                 navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", linha_alvo)
                                 time.sleep(1)
@@ -682,7 +684,6 @@ def vigiar():
                             print(f"   [Diário] ❌ Erro: {str(e_diario)[:80]}")
                             relatorio_telegram += f"  ❌ Erro Diário: {str(e_diario)[:80]}\n"
 
-                    # 🔥 OCORRÊNCIAS: O bot agora só usa "Pendente", não importa a aula
                     if aula['status_ocorrencia'] in ["Pendente", "Pendente_Nova"]:
                         try:
                             lancar_ocorrencias(navegador, wait, aula)
@@ -694,7 +695,6 @@ def vigiar():
                             print(f"   [Ocorrências] ❌ Erro: {str(e_ocor)[:80]}")
                             relatorio_telegram += f"  ❌ Erro Ocorrências: {str(e_ocor)[:80]}\n"
 
-                    # 🔥 FALTAS: O bot manda "Pendente_Nova" para lançar e "Lançado" para ignorar
                     if aula['status_falta'] in ["Pendente", "Pendente_Nova"]:
                         try:
                             lancar_faltas(navegador, wait, aula, ETAPA_ATUAL)
@@ -724,6 +724,8 @@ def vigiar():
                     time.sleep(3)
                     
                     try: navegador.switch_to.alert.accept()
+                    except: pass
+                    try: navegador.execute_script("document.querySelectorAll('.swal2-container').forEach(e => e.remove());")
                     except: pass
 
                     wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']"))).click()
