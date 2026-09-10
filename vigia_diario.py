@@ -311,7 +311,7 @@ def lancar_notas(navegador, wait, nota_info):
 def vigiar():
     global ETAPA_ATUAL
     print("="*60)
-    print(" 🚀 VERSÃO DO VIGIA: V28 (LEITOR INDESTRUTÍVEL DAS 3 COLUNAS)")
+    print(" 🚀 VERSÃO DO VIGIA: V29 (RECUPERAÇÃO DE LEITURA DE ERROS ATIVADA)")
     print("="*60)
     
     try:
@@ -332,24 +332,17 @@ def vigiar():
         aulas_pendentes = []
         for aba in abas_registos:
             turma_nome = aba.title.replace("registos_", "")
-            
-            # 🔥 O LEITOR INDESTRUTÍVEL 🔥
             dados_brutos = aba.get_all_values()
             if len(dados_brutos) < 2: continue
             
             cabecalhos = [str(c).strip() for c in dados_brutos[0]]
-            
-            # Caça as colunas pelo nome aproximado (ignora espaços extras e acentos)
             col_diario = next((i + 1 for i, c in enumerate(cabecalhos) if "DIARIO" in c.upper() or "DIÁRIO" in c.upper() or c.upper() == "STATUS"), 9)
             col_ocorrencia = next((i + 1 for i, c in enumerate(cabecalhos) if "OCORRENCIA" in c.upper() or "OCORRÊNCIA" in c.upper()), col_diario + 1)
             col_falta = next((i + 1 for i, c in enumerate(cabecalhos) if "FALTA" in c.upper()), col_diario + 2)
             
             for indice, row in enumerate(dados_brutos[1:]):
                 linha_sheets = indice + 2 
-                
-                # Previne erro se a linha for mais curta que o cabeçalho
                 while len(row) < len(cabecalhos): row.append("")
-                
                 linha_dict = {cabecalhos[i]: row[i] for i in range(len(cabecalhos))}
                 
                 st_diario = str(row[col_diario - 1]).strip() if len(row) >= col_diario else ""
@@ -487,27 +480,34 @@ def vigiar():
                                 navegador.execute_script("arguments[0].click();", linha_alvo.find_element(By.XPATH, ".//a[contains(text(), 'Gravar')] | .//button[contains(text(), 'Gravar')] | .//input[@value='Gravar']"))
                                 
                             time.sleep(3)
-                            try: navegador.switch_to.alert.accept(); raise Exception("Bloqueado (Alerta de sistema)")
+                            
+                            # 🔥 AQUI ESTÁ A RECUPERAÇÃO DA LEITURA DE ERROS 🔥
+                            try: navegador.switch_to.alert.accept(); raise Exception("Alerta nativo de sistema do navegador.")
                             except Exception as e_a: 
-                                if "Bloqueado" in str(e_a): raise e_a
+                                if "Alerta nativo" in str(e_a): raise e_a
+                                
                             try:
                                 erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
                                 if erro_swal and erro_swal[0].is_displayed():
+                                    titulo_erro = navegador.find_element(By.ID, "swal2-title").text
                                     navegador.execute_script("arguments[0].click();", navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]"))
-                                    raise Exception(f"Bloqueado pelo sistema")
+                                    raise Exception(f"Activesoft recusou: {titulo_erro}")
                                 btn_sim = navegador.find_elements(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
                                 if btn_sim and btn_sim[0].is_displayed(): navegador.execute_script("arguments[0].click();", btn_sim[0])
                             except Exception as c_e:
-                                if "Bloqueado" in str(c_e): raise c_e
+                                if "Activesoft recusou" in str(c_e): raise c_e
                                 
                             for err in navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]"):
-                                if err.is_displayed(): raise Exception("Aviso vermelho na tela.")
+                                if err.is_displayed():
+                                    try: motivo = err.find_element(By.XPATH, "..").text
+                                    except: motivo = err.text
+                                    raise Exception(f"Aviso na tela: {motivo.replace(chr(10), ' - ')}")
                                 
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Lançado")
                             relatorio_telegram += "  ✅ Diário gravado.\n"
                         except Exception as e_diario:
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
-                            relatorio_telegram += f"  ❌ Erro Diário: {str(e_diario)[:60]}\n"
+                            relatorio_telegram += f"  ❌ Erro Diário: {str(e_diario)[:80]}\n"
 
                     if aula['status_ocorrencia'] in ["Pendente", "Pendente_Nova"]:
                         try:
@@ -516,7 +516,7 @@ def vigiar():
                             relatorio_telegram += "  ✅ Ocorrências gravadas.\n"
                         except Exception as e_ocor:
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
-                            relatorio_telegram += f"  ❌ Erro Ocorrências: {str(e_ocor)[:60]}\n"
+                            relatorio_telegram += f"  ❌ Erro Ocorrências: {str(e_ocor)[:80]}\n"
 
                     if aula['status_falta'] in ["Pendente", "Pendente_Nova"]:
                         try:
@@ -525,7 +525,7 @@ def vigiar():
                             relatorio_telegram += "  ✅ Faltas gravadas.\n"
                         except Exception as e_falta:
                             aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
-                            relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:60]}\n"
+                            relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:80]}\n"
 
                 except Exception as erro_abrir_painel:
                     print(f"❌ Falha crítica ao abrir a turma: {erro_abrir_painel}")
@@ -555,7 +555,7 @@ def vigiar():
                     
                 except Exception as e_nota:
                     nota['aba'].update_cell(2, nota['coluna_planilha'], "Erro Sistema")
-                    relatorio_telegram += f"  ❌ Erro ao lançar: {str(e_nota)[:60]}\n"
+                    relatorio_telegram += f"  ❌ Erro ao lançar: {str(e_nota)[:80]}\n"
 
         finally:
             navegador.quit()
