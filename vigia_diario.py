@@ -60,7 +60,7 @@ def conectar_sheets():
     client = gspread.authorize(creds)
     return client.open_by_key(SPREADSHEET_ID)
 
-# ================= FUNÇÕES DO DIÁRIO (INTRACÁVEIS) =================
+# ================= FUNÇÕES DO DIÁRIO (INTACTAS) =================
 def lancar_ocorrencias(navegador, wait, aula):
     if not str(aula.get('nao_fez', '')).strip(): return
     try:
@@ -630,8 +630,14 @@ def vigiar():
                         try: navegador.switch_to.alert.accept()
                         except: pass
 
-                        wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']"))).click()
-                        time.sleep(5)
+                        # 🟢 SOLUÇÃO DO TIMEOUT (Botão Exibir) 🟢
+                        try:
+                            btn_exibir = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']")))
+                            navegador.execute_script("arguments[0].click();", btn_exibir)
+                            time.sleep(3)
+                        except:
+                            pass 
+                        # ----------------------------------------
 
                         turma_site = MAPA_TURMAS.get(aula['turma'].upper().strip(), aula['turma'])
                         try:
@@ -820,9 +826,15 @@ def vigiar():
                         try: navegador.switch_to.alert.accept()
                         except: pass
 
-                        wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']"))).click()
-                        time.sleep(5)
-                        
+                        # 🟢 SOLUÇÃO DO TIMEOUT EM NOTAS (Botão Exibir) 🟢
+                        try:
+                            btn_exibir = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']")))
+                            navegador.execute_script("arguments[0].click();", btn_exibir)
+                            time.sleep(3)
+                        except:
+                            pass
+                        # -----------------------------------------------
+
                         turma_site = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'])
                         WebDriverWait(navegador, 20).until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"))).click()
                         time.sleep(6) 
