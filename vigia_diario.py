@@ -639,7 +639,7 @@ def vigiar():
                             pass 
                         # ----------------------------------------
 
-                        turma_site = MAPA_TURMAS.get(aula['turma'].upper().strip(), aula['turma'])
+                        turma_site = aula['turma'].upper().strip()
                         try:
                             botao_diario = WebDriverWait(navegador, 15).until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]")))
                             navegador.execute_script("arguments[0].click();", botao_diario)
@@ -835,7 +835,7 @@ def vigiar():
                             pass
                         # -----------------------------------------------
 
-                        turma_site = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'])
+                        turma_site = nota['turma'].upper().strip()
                         WebDriverWait(navegador, 20).until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"))).click()
                         time.sleep(6) 
                         
