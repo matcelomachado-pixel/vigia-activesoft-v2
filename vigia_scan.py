@@ -32,7 +32,6 @@ def avisar_telegram(chat_id, mensagem):
     except: pass
 
 def mandar_print_telegram(chat_id, caminho_imagem, legenda=""):
-    """ Câmera de Segurança do Scan """
     token = os.environ.get("TELEGRAM_TOKEN")
     if not token or not chat_id: return
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
@@ -66,7 +65,6 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
     return False
 
 def buscar_linhas_tabela(navegador):
-    """ Varre a página principal e todos os iframes atrás das linhas da tabela """
     navegador.switch_to.default_content()
     linhas = navegador.find_elements(By.XPATH, "//tbody/tr")
     if len(linhas) > 1: return linhas
@@ -100,7 +98,7 @@ def construir_banco_de_dados():
             })
 
     if not professores_pendentes:
-        print("🟢 Nenhum professor na fila de Onboarding (Scan).")
+        print("🟢 Nenhum professor na fila de Onboarding.")
         return
 
     chrome_options = webdriver.ChromeOptions()
@@ -111,12 +109,10 @@ def construir_banco_de_dados():
 
     for prof in professores_pendentes:
         print(f"\n🔍 Iniciando Scan para: {prof['nome']}")
-        
         navegador = webdriver.Chrome(options=chrome_options)
         wait = WebDriverWait(navegador, 15)
         
         try:
-            # Login
             navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
             wait.until(EC.presence_of_element_located((By.ID, "codigoInstituicao"))).send_keys(prof['codigo'])
             navegador.find_element(By.XPATH, "//input[contains(@placeholder, 'login')]").send_keys(prof['login'])
@@ -129,7 +125,7 @@ def construir_banco_de_dados():
             
             print(" -> Acessando tela de Ocorrências...")
             if not achar_e_clicar(navegador, "//*[@id='ocorrencias_de_alunos'] | //*[contains(text(), 'Ocorrências de alunos')]", 5):
-                raise Exception("Falha ao clicar no menu superior azul 'Ocorrências de alunos'.")
+                raise Exception("Falha ao clicar no menu 'Ocorrências de alunos'.")
             time.sleep(3)
             
             if not achar_e_clicar(navegador, "//*[contains(text(), 'Registrar ocorrência')] | //a[@href='/gerar_ocorrencias_lote/']", 5):
@@ -137,14 +133,18 @@ def construir_banco_de_dados():
             time.sleep(3)
             
             if not achar_e_clicar(navegador, "//button[normalize-space(text())='Pesquisar']", 5):
-                raise Exception("Falha ao achar o botão de 'Pesquisar' na tela de ocorrências.")
+                raise Exception("Falha ao achar o botão de 'Pesquisar'.")
             
-            print(" -> Aguardando o carregamento dos alunos...")
+            print(" -> Aguardando o carregamento inicial dos alunos...")
             time.sleep(12) 
             
             turmas_coletadas = {} 
+            limite_scrolls = 0 
+            tentativas_sem_novos_alunos = 0
+            total_alunos_anterior = 0
             
-            while True:
+            while limite_scrolls < 50: # Trava de no máximo 50 rolagens
+                limite_scrolls += 1
                 linhas = buscar_linhas_tabela(navegador)
                 
                 if not linhas:
@@ -162,7 +162,6 @@ def construir_banco_de_dados():
                             txt = td.text.strip()
                             if not txt: continue
                             
-                            # Identifica turma, número e nome
                             if "ANO" in txt.upper() or "SÉRIE" in txt.upper() or "SERIE" in txt.upper() or " EM " in txt.upper():
                                 texto_turma = txt.upper()
                             elif txt.isdigit() and not numero:
@@ -173,32 +172,42 @@ def construir_banco_de_dados():
                         if texto_turma and nome_aluno:
                             if texto_turma not in turmas_coletadas:
                                 turmas_coletadas[texto_turma] = []
+                            # Adiciona só se o aluno ainda não existir na turma
                             if not any(a['nome'] == nome_aluno for a in turmas_coletadas[texto_turma]):
                                 turmas_coletadas[texto_turma].append({"n": numero, "nome": nome_aluno})
                     except: pass
                 
+                total_atual = sum(len(alunos) for alunos in turmas_coletadas.values())
+                
+                # Verifica se a rolagem trouxe alunos novos
+                if total_atual == total_alunos_anterior and total_atual > 0:
+                    tentativas_sem_novos_alunos += 1
+                    if tentativas_sem_novos_alunos >= 3:
+                        print(" -> Fim da lista atingido (nenhum aluno novo após 3 rolagens).")
+                        break
+                else:
+                    tentativas_sem_novos_alunos = 0
+                    total_alunos_anterior = total_atual
+                
+                # Executa a rolagem (Scroll) para o final da tabela!
                 try:
-                    btn_prox = navegador.find_element(By.XPATH, "//button[contains(., 'Próximo') or contains(@title, 'Próxima')]")
-                    if btn_prox.is_enabled():
-                        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn_prox)
-                        time.sleep(0.5)
-                        navegador.execute_script("arguments[0].click();", btn_prox)
-                        time.sleep(3)
-                    else: break
-                except: break
+                    if linhas:
+                        print(f" -> Rolando a página para baixo... (Lidos até agora: {total_atual})")
+                        navegador.execute_script("arguments[0].scrollIntoView({block: 'end'});", linhas[-1])
+                        time.sleep(4) # Espera 4 segs para o Activesoft processar o carregamento
+                except: 
+                    time.sleep(3)
 
-            total_alunos = sum(len(alunos) for alunos in turmas_coletadas.values())
             total_turmas = len(turmas_coletadas)
-            print(f" ✅ Encontrados: {total_turmas} Turmas e {total_alunos} Alunos!")
+            print(f" ✅ Scan Finalizado: {total_turmas} Turmas e {total_atual} Alunos!")
 
             if total_turmas == 0:
-                raise Exception("Cheguei na tela de Ocorrências, cliquei em Pesquisar, mas a tabela carregou vazia (0 alunos encontrados).")
+                raise Exception("Tabela carregou vazia (0 alunos).")
 
             print(" -> Criando Banco de Dados no Google Sheets...")
             for turma_nome, alunos in turmas_coletadas.items():
                 turma_limpa = limpar_nome_aba(turma_nome)
                 
-                # 1. ABA DE ALUNOS
                 nome_aba_alunos = f"alunos_{turma_limpa}"
                 df_alunos = pd.DataFrame(alunos).rename(columns={"n": "Nº", "nome": "Nome"})
                 df_alunos['Nº'] = pd.to_numeric(df_alunos['Nº'], errors='coerce')
@@ -208,7 +217,6 @@ def construir_banco_de_dados():
                 except: ws_al = planilha.add_worksheet(title=nome_aba_alunos, rows="100", cols="5")
                 ws_al.update([df_alunos.columns.values.tolist()] + df_alunos.values.tolist())
                 
-                # 2. ABA DE REGISTROS (Aulas)
                 nome_aba_reg = f"registos_{turma_limpa}"
                 colunas_reg = ["Data", "Resumo", "Para Casa", "Faltas", "Nao_Fez", "Tarefa_Nao_Feita", "Advertencias", "Destaques", "Status_Diario", "Status_Ocorrencia", "Status_Falta", "ID_Professor"]
                 try: planilha.worksheet(nome_aba_reg)
@@ -216,7 +224,6 @@ def construir_banco_de_dados():
                     ws_reg = planilha.add_worksheet(title=nome_aba_reg, rows="100", cols="15")
                     ws_reg.update([colunas_reg])
 
-                # 3. ABA DE NOTAS
                 nome_aba_notas = f"Notas_{turma_limpa}"
                 try: planilha.worksheet(nome_aba_notas)
                 except:
@@ -227,18 +234,14 @@ def construir_banco_de_dados():
 
             aba_usuarios.update_cell(prof['linha'], 8, "CONCLUIDO")
             
-            msg_final = f"✅ **Banco de Dados Construído!**\n\nEu entrei no seu Activesoft e encontrei:\n🏫 **{total_turmas} Turmas**\n👥 **{total_alunos} Alunos**\n\nTodas as abas foram criadas com o nome oficial da escola. Você já pode enviar fotos das lousas!"
+            msg_final = f"✅ **Banco de Dados Construído!**\n\nEu entrei no seu Activesoft e mapeei:\n🏫 **{total_turmas} Turmas**\n👥 **{total_atual} Alunos**\n\nTodas as abas foram criadas com o nome oficial."
             avisar_telegram(prof['chat_id'], msg_final)
-            print(f" 🎉 Onboarding de {prof['nome']} finalizado!")
 
         except Exception as e:
-            print(f"❌ Erro no scan de {prof['nome']}: {e}")
             try:
-                # Agora o robô manda foto exata de ONDE deu erro!
                 navegador.save_screenshot("erro_scan.png")
-                mandar_print_telegram(prof['chat_id'], "erro_scan.png", f"🚨 *Erro no Robô Scan*\n\nTravei no meio do caminho. Motivo:\n`{e}`\n\nVeja a foto da tela exata onde eu parei:")
+                mandar_print_telegram(prof['chat_id'], "erro_scan.png", f"🚨 *Erro no Robô Scan*\n\nTravei no meio do caminho. Motivo:\n`{str(e)[:150]}`\n\nVeja a foto da tela exata onde eu parei:")
             except: pass
-            
             aba_usuarios.update_cell(prof['linha'], 8, "") 
         finally:
             navegador.quit()
