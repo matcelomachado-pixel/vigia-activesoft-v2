@@ -52,38 +52,38 @@ def traduzir_nome_para_activesoft(nome_sujo):
             return f"{numero}ª SÉRIE {letra}"
     return nome_sujo
 
-def selecionar_dropdown_iframe(navegador, xpath_label, texto_para_digitar):
-    """A Lógica Antiga Vitoriosa: Procura o campo e CLICA NO ITEM DA LISTA"""
-    wait = WebDriverWait(navegador, 10)
-    
+def selecionar_dropdown_iframe(navegador, palavra_chave, texto_para_digitar):
+    """Nova Versão Blindada: Ignora asteriscos vermelhos e acha o input direto"""
     def tentar_selecionar(driver):
         try:
-            # 1. Encontra a label (Turma ou Fase)
-            label = wait.until(EC.presence_of_element_located((By.XPATH, xpath_label)))
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", label)
+            # 1. Procura o texto em qualquer lugar do rótulo e pega o PRIMEIRO input logo depois dele
+            xpath_input = f"//label[contains(., '{palavra_chave}')]/following::input[1]"
+            wait = WebDriverWait(driver, 10)
+            input_field = wait.until(EC.presence_of_element_located((By.XPATH, xpath_input)))
+            
+            # 2. Centraliza a tela nele
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_field)
             time.sleep(0.5)
             
-            # 2. Clica na caixa para abrir a lista
-            caixa = driver.find_element(By.XPATH, f"{xpath_label}/following-sibling::div")
-            caixa.click()
-            time.sleep(1.5)
+            # 3. Força o clique direto no input usando JavaScript (ignora bloqueios)
+            driver.execute_script("arguments[0].click();", input_field)
+            time.sleep(1)
             
-            # 3. Digita para filtrar
+            # 4. Limpa e Digita
             try:
-                input_field = caixa.find_element(By.TAG_NAME, "input")
-                input_field.send_keys(texto_para_digitar)
+                input_field.clear()
             except:
-                ativo = driver.switch_to.active_element
-                ativo.send_keys(texto_para_digitar)
+                input_field.send_keys(Keys.CONTROL + "a")
+                input_field.send_keys(Keys.DELETE)
                 
-            time.sleep(2) # Espera a lista flutuante carregar
+            input_field.send_keys(texto_para_digitar)
+            time.sleep(2) # Pausa crucial para a lista flutuante nascer
             
-            # 4. A SOLUÇÃO MESTRA: Clica diretamente na opção que surgiu!
-            xpath_opcao = f"//span[contains(text(), '{texto_para_digitar}')] | //div[contains(text(), '{texto_para_digitar}') and not(contains(@class, 'input'))] | //li[contains(text(), '{texto_para_digitar}')]"
+            # 5. Clica fisicamente na opção flutuante
+            xpath_opcao = f"//span[contains(., '{texto_para_digitar}')] | //div[contains(., '{texto_para_digitar}') and not(contains(@class, 'input'))] | //li[contains(., '{texto_para_digitar}')]"
             opcoes = driver.find_elements(By.XPATH, xpath_opcao)
             
             clicado = False
-            # Lemos a lista de trás pra frente, porque o menu suspenso geralmente é o último elemento criado no código da página
             for opcao in reversed(opcoes):
                 if opcao.is_displayed():
                     driver.execute_script("arguments[0].click();", opcao)
@@ -91,12 +91,11 @@ def selecionar_dropdown_iframe(navegador, xpath_label, texto_para_digitar):
                     break
                     
             if not clicado:
-                # Plano B extremo (se nada flutuar)
-                driver.switch_to.active_element.send_keys(Keys.ENTER)
+                input_field.send_keys(Keys.ENTER)
                 
-            time.sleep(1)
+            time.sleep(1.5)
             return True
-        except:
+        except Exception as e:
             return False
 
     # Vasculha a página e os iframes
@@ -174,11 +173,12 @@ def rodar_lancamentos():
                 wait_long = WebDriverWait(navegador, 20)
                 time.sleep(5) 
                 
+                # Chamadas simplificadas e matadoras
                 print(f" -> Selecionando etapa: {etapa_atual}")
-                selecionar_dropdown_iframe(navegador, "//label[contains(text(), 'Fase') or contains(text(), 'Etapa')]", etapa_atual)
+                selecionar_dropdown_iframe(navegador, "Fase", etapa_atual)
                 
                 print(f" -> Selecionando turma no menu: {nome_turma_bonito}")
-                sucesso = selecionar_dropdown_iframe(navegador, "//label[contains(text(), 'Turma')]", nome_turma_bonito)
+                sucesso = selecionar_dropdown_iframe(navegador, "Turma", nome_turma_bonito)
                 
                 if not sucesso:
                     raise Exception(f"Não consegui clicar na turma {nome_turma_bonito}.")
