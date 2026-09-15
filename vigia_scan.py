@@ -161,12 +161,18 @@ def construir_banco_de_dados():
                         for td in tds:
                             txt = td.text.strip()
                             if not txt: continue
+                            txt_upper = txt.upper()
                             
-                            if "ANO" in txt.upper() or "SÉRIE" in txt.upper() or "SERIE" in txt.upper():
-                                texto_turma = txt.upper()
+                            # 1. É a TURMA? (Tem ANO/SÉRIE e obrigatoriamente tem NÚMERO como 6, 7, 8, 9, 1, 2026)
+                            if ("ANO" in txt_upper or "SÉRIE" in txt_upper or "SERIE" in txt_upper) and any(c.isdigit() for c in txt_upper):
+                                texto_turma = txt_upper
+                                
+                            # 2. É o NÚMERO de chamada? (É composto apenas por dígitos numéricos)
                             elif txt.isdigit() and not numero:
                                 numero = txt
-                            elif len(txt) > 4 and not txt.isdigit() and "SÉRIE" not in txt.upper() and not nome_aluno:
+                                
+                            # 3. É o NOME do aluno? (Não tem números, tem espaço separando nome/sobrenome)
+                            elif len(txt) > 5 and not any(c.isdigit() for c in txt_upper) and " " in txt_upper and not nome_aluno:
                                 nome_aluno = txt.title()
                                 
                         if texto_turma and nome_aluno:
