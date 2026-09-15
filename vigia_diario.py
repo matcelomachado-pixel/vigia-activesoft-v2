@@ -53,52 +53,51 @@ def traduzir_nome_para_activesoft(nome_sujo):
     return nome_sujo
 
 def selecionar_dropdown_iframe(navegador, palavra_chave, texto_para_digitar):
-    """Nova Versão Blindada: Ignora asteriscos vermelhos e acha o input direto"""
+    """Utiliza o JavaScript Executor (Trator) para forçar o clique na caixa e na lista"""
+    wait = WebDriverWait(navegador, 15)
+    
     def tentar_selecionar(driver):
         try:
-            # 1. Procura o texto em qualquer lugar do rótulo e pega o PRIMEIRO input logo depois dele
-            xpath_input = f"//label[contains(., '{palavra_chave}')]/following::input[1]"
-            wait = WebDriverWait(driver, 10)
-            input_field = wait.until(EC.presence_of_element_located((By.XPATH, xpath_input)))
+            # 1. Localiza a caixa suspensa procurando pela label (Turma ou Fase)
+            xpath_caixa = f"//label[contains(., '{palavra_chave}')]/following-sibling::div"
+            caixa = wait.until(EC.presence_of_element_located((By.XPATH, xpath_caixa)))
             
-            # 2. Centraliza a tela nele
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_field)
-            time.sleep(0.5)
-            
-            # 3. Força o clique direto no input usando JavaScript (ignora bloqueios)
-            driver.execute_script("arguments[0].click();", input_field)
+            # Força o clique diretamente na caixa via JavaScript para abri-la
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", caixa)
             time.sleep(1)
+            driver.execute_script("arguments[0].click();", caixa)
+            time.sleep(1.5)
             
-            # 4. Limpa e Digita
+            # 2. Digita o texto para filtrar a lista
             try:
-                input_field.clear()
+                input_field = caixa.find_element(By.TAG_NAME, "input")
+                input_field.send_keys(texto_para_digitar)
             except:
-                input_field.send_keys(Keys.CONTROL + "a")
-                input_field.send_keys(Keys.DELETE)
+                ativo = driver.switch_to.active_element
+                ativo.send_keys(texto_para_digitar)
                 
-            input_field.send_keys(texto_para_digitar)
-            time.sleep(2) # Pausa crucial para a lista flutuante nascer
+            time.sleep(2) # Aguarda o Activesoft processar a busca e gerar o HTML flutuante
             
-            # 5. Clica fisicamente na opção flutuante
-            xpath_opcao = f"//span[contains(., '{texto_para_digitar}')] | //div[contains(., '{texto_para_digitar}') and not(contains(@class, 'input'))] | //li[contains(., '{texto_para_digitar}')]"
+            # 3. Força o clique na opção exata via JavaScript
+            # Procura por qualquer elemento (li, span, div) que contenha o texto
+            xpath_opcao = f"//*[contains(text(), '{texto_para_digitar}') and not(contains(@class, 'input'))]"
             opcoes = driver.find_elements(By.XPATH, xpath_opcao)
             
             clicado = False
-            for opcao in reversed(opcoes):
-                if opcao.is_displayed():
-                    driver.execute_script("arguments[0].click();", opcao)
-                    clicado = True
-                    break
+            for opcao in reversed(opcoes): # Lemos de trás pra frente caso haja sobreposição no HTML
+                driver.execute_script("arguments[0].click();", opcao)
+                clicado = True
+                break
                     
             if not clicado:
-                input_field.send_keys(Keys.ENTER)
+                driver.switch_to.active_element.send_keys(Keys.ENTER)
                 
             time.sleep(1.5)
             return True
-        except Exception as e:
+        except:
             return False
 
-    # Vasculha a página e os iframes
+    # Vasculha a página e os iframes procurando o campo
     navegador.switch_to.default_content()
     if tentar_selecionar(navegador): return True
     
@@ -173,7 +172,6 @@ def rodar_lancamentos():
                 wait_long = WebDriverWait(navegador, 20)
                 time.sleep(5) 
                 
-                # Chamadas simplificadas e matadoras
                 print(f" -> Selecionando etapa: {etapa_atual}")
                 selecionar_dropdown_iframe(navegador, "Fase", etapa_atual)
                 
@@ -181,14 +179,15 @@ def rodar_lancamentos():
                 sucesso = selecionar_dropdown_iframe(navegador, "Turma", nome_turma_bonito)
                 
                 if not sucesso:
-                    raise Exception(f"Não consegui clicar na turma {nome_turma_bonito}.")
+                    raise Exception(f"Não consegui selecionar a turma {nome_turma_bonito} via JavaScript.")
                 
+                # Clica em Consultar
                 navegador.switch_to.default_content() 
                 for f in navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame"):
                     navegador.switch_to.default_content()
                     try:
                         navegador.switch_to.frame(f)
-                        btn = navegador.find_element(By.XPATH, "//button[normalize-space(text())='CONSULTAR']")
+                        btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[normalize-space(text())='CONSULTAR']")))
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].click();", btn)
