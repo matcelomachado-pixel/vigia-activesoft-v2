@@ -52,31 +52,49 @@ def traduzir_nome_para_activesoft(nome_sujo):
             return f"{numero}ª SÉRIE {letra}"
     return nome_sujo
 
-def selecionar_dropdown(navegador, xpath_label, texto_para_digitar):
+def selecionar_dropdown_iframe(navegador, xpath_label, texto_para_digitar):
+    """A Lógica Antiga Vitoriosa: Procura o campo na tela principal e dentro dos iframes"""
     wait = WebDriverWait(navegador, 10)
-    try:
-        label = wait.until(EC.presence_of_element_located((By.XPATH, xpath_label)))
-        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", label)
-        time.sleep(0.5)
-        
-        caixa = navegador.find_element(By.XPATH, f"{xpath_label}/following-sibling::div")
-        caixa.click()
-        time.sleep(1.5) # Pausa para a caixa abrir
-        
+    
+    # Função interna para não repetir código
+    def tentar_selecionar(driver):
         try:
-            input_field = caixa.find_element(By.TAG_NAME, "input")
-            input_field.send_keys(texto_para_digitar)
-        except:
-            ativo = navegador.switch_to.active_element
-            ativo.send_keys(texto_para_digitar)
+            label = wait.until(EC.presence_of_element_located((By.XPATH, xpath_label)))
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", label)
+            time.sleep(0.5)
             
-        time.sleep(2) 
-        navegador.switch_to.active_element.send_keys(Keys.ENTER)
-        time.sleep(1)
-        return True
-    except Exception as e:
-        print(f"Erro ao selecionar dropdown: {e}")
-        return False
+            caixa = driver.find_element(By.XPATH, f"{xpath_label}/following-sibling::div")
+            caixa.click()
+            time.sleep(1.5)
+            
+            try:
+                input_field = caixa.find_element(By.TAG_NAME, "input")
+                input_field.send_keys(texto_para_digitar)
+            except:
+                ativo = driver.switch_to.active_element
+                ativo.send_keys(texto_para_digitar)
+                
+            time.sleep(2) 
+            driver.switch_to.active_element.send_keys(Keys.ENTER)
+            time.sleep(1)
+            return True
+        except:
+            return False
+
+    # 1. Tenta na tela principal
+    navegador.switch_to.default_content()
+    if tentar_selecionar(navegador): return True
+    
+    # 2. Se falhar, vasculha os iframes (A sacada de mestre do código antigo!)
+    iframes = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
+    for iframe in iframes:
+        navegador.switch_to.default_content()
+        try:
+            navegador.switch_to.frame(iframe)
+            if tentar_selecionar(navegador): return True
+        except: pass
+        
+    return False
 
 def rodar_lancamentos():
     print("="*60)
@@ -109,7 +127,6 @@ def rodar_lancamentos():
         wait = WebDriverWait(navegador, 15)
         
         try:
-            # FAZ LOGIN
             navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
             wait.until(EC.presence_of_element_located((By.ID, "codigoInstituicao"))).send_keys(prof['codigo'])
             navegador.find_element(By.XPATH, "//input[contains(@placeholder, 'login')]").send_keys(prof['login'])
@@ -130,30 +147,38 @@ def rodar_lancamentos():
                 nome_turma_bonito = traduzir_nome_para_activesoft(nome_turma_bruto)
                 print(f" -> Turma bruta: {nome_turma_bruto} | Traduzida: {nome_turma_bonito}")
                 
-                # NAVEGAÇÃO CORRIGIDA (Clica no menu em vez de forçar a URL)
-                print(" -> Acessando menu de Frequência na barra superior...")
+                print(" -> Acessando menu de Frequência...")
                 try:
                     menu_freq = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Frequência em lote')]")))
                     navegador.execute_script("arguments[0].click();", menu_freq)
                 except:
                     navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/frequencia_lote/")
                 
-                print(" -> Aguardando a tela branca sumir e o formulário carregar...")
-                # Trava o robô por até 20 segundos esperando a tela carregar
                 wait_long = WebDriverWait(navegador, 20)
-                wait_long.until(EC.presence_of_element_located((By.XPATH, "//label[contains(text(), 'Fase') or contains(text(), 'Etapa')]")))
-                time.sleep(3) # Respira fundo para o Activesoft processar as listas
+                # Tenta esperar que o label "Etapa" apareça na tela ou em algum iframe
+                time.sleep(5) 
                 
                 print(f" -> Selecionando etapa: {etapa_atual}")
-                selecionar_dropdown(navegador, "//label[contains(text(), 'Fase') or contains(text(), 'Etapa')]", etapa_atual)
+                selecionar_dropdown_iframe(navegador, "//label[contains(text(), 'Fase') or contains(text(), 'Etapa')]", etapa_atual)
                 
                 print(f" -> Selecionando turma no menu: {nome_turma_bonito}")
-                sucesso = selecionar_dropdown(navegador, "//label[contains(text(), 'Turma')]", nome_turma_bonito)
+                sucesso = selecionar_dropdown_iframe(navegador, "//label[contains(text(), 'Turma')]", nome_turma_bonito)
                 
                 if not sucesso:
                     raise Exception(f"Não consegui clicar na turma {nome_turma_bonito}.")
                 
-                navegador.find_element(By.XPATH, "//button[normalize-space(text())='CONSULTAR']").click()
+                navegador.switch_to.default_content() # Garante que está no topo pra achar o botão
+                for f in navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame"):
+                    navegador.switch_to.default_content()
+                    try:
+                        navegador.switch_to.frame(f)
+                        btn = navegador.find_element(By.XPATH, "//button[normalize-space(text())='CONSULTAR']")
+                        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+                        time.sleep(0.5)
+                        navegador.execute_script("arguments[0].click();", btn)
+                        break
+                    except: pass
+                
                 print(" -> Botão CONSULTAR clicado. Aguardando a tabela...")
                 time.sleep(5)
                 
