@@ -102,7 +102,6 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
 
 # ================= TRADUTOR =================
 def traduzir_nome_para_activesoft(nome_sujo):
-    """Lê o nome sujo da aba e traduz para o formato humano (Ex: 9º ANO A)"""
     match = re.search(r'(\d)([A-Z])$', nome_sujo.upper())
     if match:
         numero = match.group(1)
@@ -112,7 +111,6 @@ def traduzir_nome_para_activesoft(nome_sujo):
         else:
             return f"{numero}ª SÉRIE {letra}"
     return nome_sujo
-
 # ================= FUNÇÕES DO DIÁRIO =================
 def lancar_ocorrencias(navegador, wait, aula):
     if not str(aula.get('nao_fez', '')).strip(): return
@@ -745,6 +743,7 @@ def vigiar():
                         time.sleep(3)
 
                         # O TRADUTOR NA TELA INICIAL (Ajuste cirúrgico)
+                        nome_traduzido = traduzir_nome_para_activesoft(aula['turma'])
                         nome_traduzido = traduzir_nome_para_activesoft(aula['turma'])
                         turma_site = MAPA_TURMAS.get(nome_traduzido.upper().strip(), nome_traduzido)
                         
