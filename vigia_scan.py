@@ -162,7 +162,7 @@ def construir_banco_de_dados():
                             txt = td.text.strip()
                             if not txt: continue
                             
-                            if "ANO" in txt.upper() or "SÉRIE" in txt.upper() or "SERIE" in txt.upper() or " EM " in txt.upper():
+                            if "ANO" in txt.upper() or "SÉRIE" in txt.upper() or "SERIE" in txt.upper():
                                 texto_turma = txt.upper()
                             elif txt.isdigit() and not numero:
                                 numero = txt
