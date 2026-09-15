@@ -678,7 +678,8 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        turma_site = MAPA_TURMAS.get(aula['turma'].upper().strip(), aula['turma'])
+                        nome_traduzido = traduzir_nome_para_activesoft(aula['turma'])
+                        turma_site = MAPA_TURMAS.get(nome_traduzido.upper().strip(), nome_traduzido)
                         xpath_diario = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"
                         
                         if not achar_e_clicar(navegador, xpath_diario, tempo_espera=5):
@@ -880,7 +881,8 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        turma_site = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'])
+                        nome_traduzido = traduzir_nome_para_activesoft(nota['turma'])
+                        turma_site = MAPA_TURMAS.get(nome_traduzido.upper().strip(), nome_traduzido)
                         xpath_notas = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
                         
                         if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
