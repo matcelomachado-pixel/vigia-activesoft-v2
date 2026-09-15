@@ -817,7 +817,7 @@ def vigiar():
                                 print(f"   [Ocorrências] ❌ Erro: {str(e_ocor)[:80]}")
                                 relatorio_telegram += f"  ❌ Erro Ocorrências: {str(e_ocor)[:80]}\n"
 
-                        if aula['status_falta'] in ["Pendente", "Pendente_Nova"]:
+                       if aula['status_falta'] in ["Pendente", "Pendente_Nova"]:
                             try:
                                 lancar_faltas(navegador, wait, aula, etapa_atual)
                                 aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Lançado")
@@ -827,6 +827,11 @@ def vigiar():
                                 aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
                                 print(f"   [Faltas] ❌ Erro: {str(e_falta)[:80]}")
                                 relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:80]}\n"
+                                # 🔥 CÂMERA DE SEGURANÇA NAS FALTAS 🔥
+                                try:
+                                    navegador.save_screenshot("erro_falta.png")
+                                    mandar_print_telegram(id_prof, "erro_falta.png", f"🚨 *Erro nas Faltas: {aula['turma']}*\nO robô não achou o nome dessa turma no menu. Veja a foto:")
+                                except: pass"
 
                     except Exception as erro_abrir_painel:
                         print(f"❌ Falha crítica ao abrir a turma: {erro_abrir_painel}")
