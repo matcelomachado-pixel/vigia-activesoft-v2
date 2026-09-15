@@ -57,7 +57,7 @@ def avisar_telegram(chat_id, mensagem):
         pass
 
 def mandar_print_telegram(chat_id, caminho_imagem, legenda=""):
-    """ Tira uma foto da tela do robô e manda para o seu celular """
+    """ Câmera de Segurança do Robô """
     token = os.environ.get("TELEGRAM_TOKEN")
     if not token or not chat_id: 
         return
@@ -244,7 +244,11 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         for s in ["1", "2", "3"]:
             if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta: serie_busca = s
             
-        turma_exata = turma_bruta.replace("º", "°")
+        # 🔥 A MÁGICA DO SELETOR: Extrai apenas a letra da turma
+        letra_turma = ""
+        partes = turma_bruta.split()
+        if partes[-1] in ["A", "B", "C", "D", "E"]:
+            letra_turma = partes[-1]
         
         def preencher_select_blindado(idx, texto):
             try:
@@ -303,9 +307,58 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 time.sleep(2.5) 
             except: pass
 
+        def selecionar_turma_por_seta(idx, letra):
+            """ Selecionador Inteligente para a Turma """
+            try:
+                navegador.switch_to.default_content()
+                inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+                if not inps: 
+                    frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
+                    for f in frames:
+                        navegador.switch_to.default_content()
+                        try:
+                            navegador.switch_to.frame(f)
+                            inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+                            if inps: break
+                        except: pass
+                
+                if idx >= len(inps): return
+                inp = inps[idx]
+                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
+                time.sleep(1)
+                
+                try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
+                except: pass
+                time.sleep(1)
+                navegador.execute_script("arguments[0].focus();", inp)
+                
+                try:
+                    inp.send_keys(Keys.CONTROL + "a")
+                    inp.send_keys(Keys.BACKSPACE)
+                except: pass
+                time.sleep(0.5)
+                
+                if letra:
+                    try: inp.send_keys(letra)
+                    except: navegador.execute_script(JS_REACT_SETTER, inp, letra)
+                    time.sleep(1.5)
+                    
+                # Aperta para baixo e Enter para pegar a primeira opção filtrada!
+                try: 
+                    inp.send_keys(Keys.ARROW_DOWN)
+                    time.sleep(0.5)
+                    inp.send_keys(Keys.ENTER)
+                except:
+                    navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
+                    time.sleep(0.5)
+                    navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
+                time.sleep(2)
+            except: pass
+
+        # Preenche os campos usando a nova lógica
         preencher_select_blindado(1, curso)        
         preencher_select_blindado(2, serie_busca)       
-        preencher_select_blindado(3, turma_exata)  
+        selecionar_turma_por_seta(3, letra_turma)  # <--- O NOVO SELETOR!
         preencher_select_blindado(5, etapa_atual)
         
         inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
