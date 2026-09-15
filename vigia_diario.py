@@ -53,20 +53,22 @@ def traduzir_nome_para_activesoft(nome_sujo):
     return nome_sujo
 
 def selecionar_dropdown_iframe(navegador, xpath_label, texto_para_digitar):
-    """A Lógica Antiga Vitoriosa: Procura o campo na tela principal e dentro dos iframes"""
+    """A Lógica Antiga Vitoriosa: Procura o campo e CLICA NO ITEM DA LISTA"""
     wait = WebDriverWait(navegador, 10)
     
-    # Função interna para não repetir código
     def tentar_selecionar(driver):
         try:
+            # 1. Encontra a label (Turma ou Fase)
             label = wait.until(EC.presence_of_element_located((By.XPATH, xpath_label)))
             driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", label)
             time.sleep(0.5)
             
+            # 2. Clica na caixa para abrir a lista
             caixa = driver.find_element(By.XPATH, f"{xpath_label}/following-sibling::div")
             caixa.click()
             time.sleep(1.5)
             
+            # 3. Digita para filtrar
             try:
                 input_field = caixa.find_element(By.TAG_NAME, "input")
                 input_field.send_keys(texto_para_digitar)
@@ -74,18 +76,33 @@ def selecionar_dropdown_iframe(navegador, xpath_label, texto_para_digitar):
                 ativo = driver.switch_to.active_element
                 ativo.send_keys(texto_para_digitar)
                 
-            time.sleep(2) 
-            driver.switch_to.active_element.send_keys(Keys.ENTER)
+            time.sleep(2) # Espera a lista flutuante carregar
+            
+            # 4. A SOLUÇÃO MESTRA: Clica diretamente na opção que surgiu!
+            xpath_opcao = f"//span[contains(text(), '{texto_para_digitar}')] | //div[contains(text(), '{texto_para_digitar}') and not(contains(@class, 'input'))] | //li[contains(text(), '{texto_para_digitar}')]"
+            opcoes = driver.find_elements(By.XPATH, xpath_opcao)
+            
+            clicado = False
+            # Lemos a lista de trás pra frente, porque o menu suspenso geralmente é o último elemento criado no código da página
+            for opcao in reversed(opcoes):
+                if opcao.is_displayed():
+                    driver.execute_script("arguments[0].click();", opcao)
+                    clicado = True
+                    break
+                    
+            if not clicado:
+                # Plano B extremo (se nada flutuar)
+                driver.switch_to.active_element.send_keys(Keys.ENTER)
+                
             time.sleep(1)
             return True
         except:
             return False
 
-    # 1. Tenta na tela principal
+    # Vasculha a página e os iframes
     navegador.switch_to.default_content()
     if tentar_selecionar(navegador): return True
     
-    # 2. Se falhar, vasculha os iframes (A sacada de mestre do código antigo!)
     iframes = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
     for iframe in iframes:
         navegador.switch_to.default_content()
@@ -155,7 +172,6 @@ def rodar_lancamentos():
                     navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/frequencia_lote/")
                 
                 wait_long = WebDriverWait(navegador, 20)
-                # Tenta esperar que o label "Etapa" apareça na tela ou em algum iframe
                 time.sleep(5) 
                 
                 print(f" -> Selecionando etapa: {etapa_atual}")
@@ -167,7 +183,7 @@ def rodar_lancamentos():
                 if not sucesso:
                     raise Exception(f"Não consegui clicar na turma {nome_turma_bonito}.")
                 
-                navegador.switch_to.default_content() # Garante que está no topo pra achar o botão
+                navegador.switch_to.default_content() 
                 for f in navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame"):
                     navegador.switch_to.default_content()
                     try:
