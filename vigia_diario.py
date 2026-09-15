@@ -42,7 +42,6 @@ def conectar_sheets():
 
 def traduzir_nome_para_activesoft(nome_sujo):
     """Lê o nome sujo da aba e traduz para o formato humano (Ex: 9º ANO A)"""
-    # Procura o último número e a última letra no nome (ex: 9 e A)
     match = re.search(r'(\d)([A-Z])$', nome_sujo.upper())
     if match:
         numero = match.group(1)
@@ -56,16 +55,14 @@ def traduzir_nome_para_activesoft(nome_sujo):
 def selecionar_dropdown(navegador, xpath_label, texto_para_digitar):
     wait = WebDriverWait(navegador, 10)
     try:
-        # 1. Acha o título (Ex: "Turma") e clica na caixa logo abaixo dele
         label = wait.until(EC.presence_of_element_located((By.XPATH, xpath_label)))
         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", label)
         time.sleep(0.5)
         
         caixa = navegador.find_element(By.XPATH, f"{xpath_label}/following-sibling::div")
         caixa.click()
-        time.sleep(1)
+        time.sleep(1.5) # Pausa para a caixa abrir
         
-        # 2. Agora que a caixa abriu, procura o campo de digitar
         try:
             input_field = caixa.find_element(By.TAG_NAME, "input")
             input_field.send_keys(texto_para_digitar)
@@ -73,7 +70,7 @@ def selecionar_dropdown(navegador, xpath_label, texto_para_digitar):
             ativo = navegador.switch_to.active_element
             ativo.send_keys(texto_para_digitar)
             
-        time.sleep(2) # Pausa pro Activesoft achar a turma na lista
+        time.sleep(2) 
         navegador.switch_to.active_element.send_keys(Keys.ENTER)
         time.sleep(1)
         return True
@@ -112,6 +109,7 @@ def rodar_lancamentos():
         wait = WebDriverWait(navegador, 15)
         
         try:
+            # FAZ LOGIN
             navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
             wait.until(EC.presence_of_element_located((By.ID, "codigoInstituicao"))).send_keys(prof['codigo'])
             navegador.find_element(By.XPATH, "//input[contains(@placeholder, 'login')]").send_keys(prof['login'])
@@ -132,8 +130,19 @@ def rodar_lancamentos():
                 nome_turma_bonito = traduzir_nome_para_activesoft(nome_turma_bruto)
                 print(f" -> Turma bruta: {nome_turma_bruto} | Traduzida: {nome_turma_bonito}")
                 
-                navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/frequencia_lote/")
-                time.sleep(4)
+                # NAVEGAÇÃO CORRIGIDA (Clica no menu em vez de forçar a URL)
+                print(" -> Acessando menu de Frequência na barra superior...")
+                try:
+                    menu_freq = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Frequência em lote')]")))
+                    navegador.execute_script("arguments[0].click();", menu_freq)
+                except:
+                    navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/frequencia_lote/")
+                
+                print(" -> Aguardando a tela branca sumir e o formulário carregar...")
+                # Trava o robô por até 20 segundos esperando a tela carregar
+                wait_long = WebDriverWait(navegador, 20)
+                wait_long.until(EC.presence_of_element_located((By.XPATH, "//label[contains(text(), 'Fase') or contains(text(), 'Etapa')]")))
+                time.sleep(3) # Respira fundo para o Activesoft processar as listas
                 
                 print(f" -> Selecionando etapa: {etapa_atual}")
                 selecionar_dropdown(navegador, "//label[contains(text(), 'Fase') or contains(text(), 'Etapa')]", etapa_atual)
@@ -145,6 +154,7 @@ def rodar_lancamentos():
                     raise Exception(f"Não consegui clicar na turma {nome_turma_bonito}.")
                 
                 navegador.find_element(By.XPATH, "//button[normalize-space(text())='CONSULTAR']").click()
+                print(" -> Botão CONSULTAR clicado. Aguardando a tabela...")
                 time.sleep(5)
                 
                 # =================================================================
