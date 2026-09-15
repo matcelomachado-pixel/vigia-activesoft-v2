@@ -56,13 +56,25 @@ def avisar_telegram(chat_id, mensagem):
     except: 
         pass
 
+def mandar_print_telegram(chat_id, caminho_imagem, legenda=""):
+    """ Tira uma foto da tela do robô e manda para o seu celular """
+    token = os.environ.get("TELEGRAM_TOKEN")
+    if not token or not chat_id: 
+        return
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    try:
+        with open(caminho_imagem, 'rb') as f:
+            requests.post(url, data={"chat_id": chat_id, "caption": legenda}, files={"photo": f}, timeout=15)
+    except: 
+        pass
+
 def conectar_sheets():
     creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", SCOPE) 
     client = gspread.authorize(creds)
     return client.open_by_key(SPREADSHEET_ID)
 
 def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
-    """ O Caçador Blindado: Varre a página inteira e todos os iframes atrás do botão """
+    """ O Caçador Blindado """
     navegador.switch_to.default_content()
     try:
         btn = WebDriverWait(navegador, tempo_espera).until(EC.presence_of_element_located((By.XPATH, xpath_alvo)))
@@ -479,7 +491,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V37 (ARQUITETURA MULTI-USUÁRIO CLÁSSICA)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V37 (ARQUITETURA MULTI-USUÁRIO CÂMERA)")
     print("="*60)
     
     try:
@@ -659,11 +671,9 @@ def vigiar():
                         try: navegador.switch_to.alert.accept()
                         except: pass
 
-                        # Tenta clicar no botão Exibir usando a varredura blindada
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        # Usa o MAPA_TURMAS Restaurado
                         turma_site = MAPA_TURMAS.get(aula['turma'].upper().strip(), aula['turma'])
                         xpath_diario = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"
                         
@@ -817,7 +827,7 @@ def vigiar():
                                 print(f"   [Ocorrências] ❌ Erro: {str(e_ocor)[:80]}")
                                 relatorio_telegram += f"  ❌ Erro Ocorrências: {str(e_ocor)[:80]}\n"
 
-                       if aula['status_falta'] in ["Pendente", "Pendente_Nova"]:
+                        if aula['status_falta'] in ["Pendente", "Pendente_Nova"]:
                             try:
                                 lancar_faltas(navegador, wait, aula, etapa_atual)
                                 aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Lançado")
@@ -831,10 +841,18 @@ def vigiar():
                                 try:
                                     navegador.save_screenshot("erro_falta.png")
                                     mandar_print_telegram(id_prof, "erro_falta.png", f"🚨 *Erro nas Faltas: {aula['turma']}*\nO robô não achou o nome dessa turma no menu. Veja a foto:")
-                                except: pass"
+                                except: 
+                                    pass
 
                     except Exception as erro_abrir_painel:
                         print(f"❌ Falha crítica ao abrir a turma: {erro_abrir_painel}")
+                        
+                        try:
+                            navegador.save_screenshot("erro_tela.png")
+                            mandar_print_telegram(id_prof, "erro_tela.png", f"🚨 *Alerta do Vigia!*\n\nNão consegui abrir a turma *{aula['turma']}*. Tirei uma foto da tela para você ver o que me bloqueou.")
+                        except: 
+                            pass
+                        
                         if "Pendente" in aula['status_diario']: aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
                         if "Pendente" in aula['status_ocorrencia']: aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
                         if "Pendente" in aula['status_falta']: aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
@@ -873,6 +891,13 @@ def vigiar():
                     except Exception as e_nota:
                         nota['aba'].update_cell(3, nota['coluna_planilha'], "Erro Sistema")
                         print(f"   [Notas] ❌ Erro ao lançar: {str(e_nota)[:80]}")
+                        
+                        try:
+                            navegador.save_screenshot("erro_tela_notas.png")
+                            mandar_print_telegram(id_prof, "erro_tela_notas.png", f"🚨 *Alerta do Vigia!*\n\nDeu erro nas notas da turma *{nota['turma']}*. Veja a foto:")
+                        except: 
+                            pass
+                        
                         relatorio_telegram += f"  ❌ Erro ao lançar: {str(e_nota)[:80]}\n"
 
             finally:
