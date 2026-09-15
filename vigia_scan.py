@@ -69,14 +69,14 @@ def buscar_linhas_tabela(navegador):
     """ Varre a página principal e todos os iframes atrás das linhas da tabela """
     navegador.switch_to.default_content()
     linhas = navegador.find_elements(By.XPATH, "//tbody/tr")
-    if linhas: return linhas
+    if len(linhas) > 1: return linhas
     
     for f in navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame"):
         navegador.switch_to.default_content()
         try:
             navegador.switch_to.frame(f)
             linhas = navegador.find_elements(By.XPATH, "//tbody/tr")
-            if len(linhas) > 0: return linhas
+            if len(linhas) > 1: return linhas
         except: pass
     return []
 
@@ -128,24 +128,25 @@ def construir_banco_de_dados():
             except: pass 
             
             print(" -> Acessando tela de Ocorrências...")
-            achar_e_clicar(navegador, "//button[contains(text(), 'Ocorrências') or text()='Ocorrências de alunos']", 5)
-            time.sleep(3)
-            achar_e_clicar(navegador, "//a[@href='/gerar_ocorrencias_lote/' or contains(text(), 'Registrar ocorrência')]", 5)
+            if not achar_e_clicar(navegador, "//*[@id='ocorrencias_de_alunos'] | //*[contains(text(), 'Ocorrências de alunos')]", 5):
+                raise Exception("Falha ao clicar no menu superior azul 'Ocorrências de alunos'.")
             time.sleep(3)
             
-            # Clica em pesquisar para carregar todo mundo sem filtro
-            achar_e_clicar(navegador, "//button[normalize-space(text())='Pesquisar']", 5)
+            if not achar_e_clicar(navegador, "//*[contains(text(), 'Registrar ocorrência')] | //a[@href='/gerar_ocorrencias_lote/']", 5):
+                raise Exception("Falha ao clicar no submenu 'Registrar ocorrência'.")
+            time.sleep(3)
             
-            # Espera reforçada para garantir o carregamento
+            if not achar_e_clicar(navegador, "//button[normalize-space(text())='Pesquisar']", 5):
+                raise Exception("Falha ao achar o botão de 'Pesquisar' na tela de ocorrências.")
+            
             print(" -> Aguardando o carregamento dos alunos...")
             time.sleep(12) 
             
-            turmas_coletadas = {} # {"8º ANO A": [{"n": "1", "nome": "João"}, ...]}
+            turmas_coletadas = {} 
             
             while True:
                 linhas = buscar_linhas_tabela(navegador)
                 
-                # Se não achar, espera mais 5 segundos e tenta de novo (pode ser lentidão da escola)
                 if not linhas:
                     time.sleep(5)
                     linhas = buscar_linhas_tabela(navegador)
@@ -177,7 +178,6 @@ def construir_banco_de_dados():
                     except: pass
                 
                 try:
-                    # Tenta ir para a próxima página da tabela
                     btn_prox = navegador.find_element(By.XPATH, "//button[contains(., 'Próximo') or contains(@title, 'Próxima')]")
                     if btn_prox.is_enabled():
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn_prox)
@@ -191,13 +191,8 @@ def construir_banco_de_dados():
             total_turmas = len(turmas_coletadas)
             print(f" ✅ Encontrados: {total_turmas} Turmas e {total_alunos} Alunos!")
 
-            # 🔥 O GATILHO DA CÂMERA DE SEGURANÇA 🔥
             if total_turmas == 0:
-                try:
-                    navegador.save_screenshot("erro_scan.png")
-                    mandar_print_telegram(prof['chat_id'], "erro_scan.png", "🚨 *Visão do Robô Scan*\n\nCheguei na tela de Ocorrências, cliquei em Pesquisar e esperei, mas não encontrei nenhum aluno na tabela.\n\nVeja a foto acima do que apareceu na minha tela!")
-                except: pass
-                raise Exception("Nenhum aluno encontrado na tabela.")
+                raise Exception("Cheguei na tela de Ocorrências, cliquei em Pesquisar, mas a tabela carregou vazia (0 alunos encontrados).")
 
             print(" -> Criando Banco de Dados no Google Sheets...")
             for turma_nome, alunos in turmas_coletadas.items():
@@ -230,16 +225,20 @@ def construir_banco_de_dados():
                     for _, r_aluno in df_alunos.iterrows(): matriz_base.append([str(r_aluno['Nº'])[:-2] if str(r_aluno['Nº']).endswith(".0") else str(r_aluno['Nº']), str(r_aluno['Nome'])])
                     ws_not.update(matriz_base)
 
-            # Dá baixa no Onboarding
             aba_usuarios.update_cell(prof['linha'], 8, "CONCLUIDO")
             
-            # Avisa o Professor com o número REAL!
             msg_final = f"✅ **Banco de Dados Construído!**\n\nEu entrei no seu Activesoft e encontrei:\n🏫 **{total_turmas} Turmas**\n👥 **{total_alunos} Alunos**\n\nTodas as abas foram criadas com o nome oficial da escola. Você já pode enviar fotos das lousas!"
             avisar_telegram(prof['chat_id'], msg_final)
             print(f" 🎉 Onboarding de {prof['nome']} finalizado!")
 
         except Exception as e:
             print(f"❌ Erro no scan de {prof['nome']}: {e}")
+            try:
+                # Agora o robô manda foto exata de ONDE deu erro!
+                navegador.save_screenshot("erro_scan.png")
+                mandar_print_telegram(prof['chat_id'], "erro_scan.png", f"🚨 *Erro no Robô Scan*\n\nTravei no meio do caminho. Motivo:\n`{e}`\n\nVeja a foto da tela exata onde eu parei:")
+            except: pass
+            
             aba_usuarios.update_cell(prof['linha'], 8, "") 
         finally:
             navegador.quit()
