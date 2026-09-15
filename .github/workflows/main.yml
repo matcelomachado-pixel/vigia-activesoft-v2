@@ -30,8 +30,8 @@ jobs:
         echo "$GOOGLE_CREDS" > credenciais.json
 
     - name: Executar Robôs do Assessor.IA
-        env:
+      env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-        run: |
+      run: |
           python vigia_scan.py
           python vigia_diario.py
