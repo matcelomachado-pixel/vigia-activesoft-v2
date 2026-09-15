@@ -19,10 +19,11 @@ try:
 except AttributeError: 
     pass
 
-# ⚠️ O SEU NOVO SPREADSHEET OFICIAL
+# ⚠️ O SEU SPREADSHEET OFICIAL
 SPREADSHEET_ID = '17XZfEUKiiryGJgj_nXdQ7gXzdByEwsZ7ecax44ZeJmc'
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
+# ================= MAPA CLÁSSICO RESTAURADO =================
 MAPA_TURMAS = {
     "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD",
     "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD", "8B": "EFII-8B-FD",
@@ -60,15 +61,43 @@ def conectar_sheets():
     client = gspread.authorize(creds)
     return client.open_by_key(SPREADSHEET_ID)
 
-# ================= FUNÇÕES DO DIÁRIO (INTACTAS) =================
+def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
+    """ O Caçador Blindado: Varre a página inteira e todos os iframes atrás do botão """
+    navegador.switch_to.default_content()
+    try:
+        btn = WebDriverWait(navegador, tempo_espera).until(EC.presence_of_element_located((By.XPATH, xpath_alvo)))
+        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+        time.sleep(0.5)
+        navegador.execute_script("arguments[0].click();", btn)
+        return True
+    except:
+        pass
+        
+    frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
+    for f in frames:
+        navegador.switch_to.default_content()
+        try:
+            navegador.switch_to.frame(f)
+            btn = WebDriverWait(navegador, tempo_espera).until(EC.presence_of_element_located((By.XPATH, xpath_alvo)))
+            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+            time.sleep(0.5)
+            navegador.execute_script("arguments[0].click();", btn)
+            return True
+        except:
+            pass
+    return False
+
+# ================= FUNÇÕES DO DIÁRIO =================
 def lancar_ocorrencias(navegador, wait, aula):
     if not str(aula.get('nao_fez', '')).strip(): return
     try:
         texto_ocorrencia = f"Não fez a tarefa: {aula['tarefa_nao_feita']}"
         numeros_alvo = [num.strip() for num in aula['nao_fez'].split(',')]
         
-        try: navegador.switch_to.default_content()
-        except: pass
+        try: 
+            navegador.switch_to.default_content()
+        except: 
+            pass
         time.sleep(2)
         
         botao_ocorrencias = wait.until(EC.element_to_be_clickable((By.ID, "ocorrencias_de_alunos")))
@@ -99,13 +128,16 @@ def lancar_ocorrencias(navegador, wait, aula):
                         if "/" in td.text and ("ANO" in td.text.upper() or "SÉRIE" in td.text.upper() or "SERIE" in td.text.upper()):
                             texto_turma = td.text.upper().strip()
                             break
-                    if not texto_turma: texto_turma = linha.text.upper().strip()
+                    if not texto_turma: 
+                        texto_turma = linha.text.upper().strip()
+                        
                     if num_t in texto_turma:
                         match = False
                         if letra_t: 
                             if texto_turma.endswith(letra_t): match = True
                         else: 
                             if "SÉRIE" in texto_turma or "SERIE" in texto_turma: match = True
+                            
                         if match:
                             checkbox = linha.find_element(By.XPATH, ".//input[@type='checkbox']")
                             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", checkbox)
@@ -169,7 +201,8 @@ def lancar_ocorrencias(navegador, wait, aula):
         except: pass
 
 def lancar_faltas(navegador, wait, aula, etapa_atual):
-    if aula['tipo_lancamento'] != "Pendente_Nova": return
+    if aula['tipo_lancamento'] != "Pendente_Nova": 
+        return
     
     faltas_str = str(aula.get('faltas', '')).strip()
 
@@ -214,6 +247,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                             inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
                             if inps: break
                         except: pass
+                
                 if idx >= len(inps): return
                 inp = inps[idx]
                 navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
@@ -442,16 +476,15 @@ def lancar_notas(navegador, wait, nota_info):
     except Exception as e: 
         raise e
 
-# ================= MOTOR CENTRAL (O CÉREBRO MULTI-USUÁRIO) =================
+# ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V37 (ARQUITETURA MULTI-USUÁRIO REFINADA)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V37 (ARQUITETURA MULTI-USUÁRIO CLÁSSICA)")
     print("="*60)
     
     try:
         planilha = conectar_sheets()
         
-        # 1. PEGA O BANCO DE PROFESSORES
         usuarios_cadastrados = {}
         try:
             dados_usuarios = planilha.worksheet("Usuarios").get_all_values()
@@ -471,7 +504,6 @@ def vigiar():
         aulas_por_prof = {}
         notas_por_prof = {}
         
-        # 2. ESCANEIA O BANCO E SEPARA AS TAREFAS PELO CARIMBO DO ID
         abas_registos = [aba for aba in planilha.worksheets() if aba.title.startswith("registos_")]
         for aba in abas_registos:
             turma_nome = aba.title.replace("registos_", "")
@@ -492,7 +524,7 @@ def vigiar():
                 if "ID_PROFESSOR" in c: col_id_prof = i
             
             if col_id_prof == -1: 
-                continue # Ignora abas antigas que ainda não foram atualizadas com o ID
+                continue 
             
             for indice, row in enumerate(dados_brutos[1:]):
                 linha_sheets = indice + 2 
@@ -536,9 +568,8 @@ def vigiar():
             dados = aba.get_all_values()
             
             if len(dados) < 6: 
-                continue # Agora o cabeçalho exige 5 linhas (Nome, ID, Status, Data, Valor)
+                continue 
             
-            # Linha 1 = Nome, Linha 2 = ID (Index 1), Linha 3 = Status (Index 2)
             for col_idx, status in enumerate(dados[2]):
                 if str(status).strip() == "Pendente":
                     id_prof = str(dados[1][col_idx]).strip()
@@ -567,7 +598,6 @@ def vigiar():
             print(f"🟢 Nenhuma tarefa pendente no Banco Central.")
             return
 
-        # 3. EXECUTA AS TAREFAS SEPARANDO OS LOGINS POR PROFESSOR
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
@@ -586,7 +616,6 @@ def vigiar():
             print(f"\n👨‍🏫 Iniciando Lote do Professor(a): {dados_prof['nome']} ({len(minhas_aulas)} Aulas | {len(minhas_notas)} Provas)")
             relatorio_telegram = f"🤖 <b>VIGIA - RELATÓRIO DO LOTE</b>\n\n"
             
-            # Puxa a Etapa específica configurada pelo professor
             etapa_atual = "2ª Etapa"
             try:
                 valor_cru = str(planilha.worksheet(dados_prof['aba_config']).acell("B1").value).strip().lower()
@@ -602,7 +631,7 @@ def vigiar():
             wait = WebDriverWait(navegador, 10) 
             
             try:
-                # Login Seguro Específico para este ID
+                # Login
                 navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
                 wait.until(EC.presence_of_element_located((By.ID, "codigoInstituicao"))).send_keys(dados_prof['codigo'])
                 navegador.find_element(By.XPATH, "//input[contains(@placeholder, 'login')]").send_keys(dados_prof['login'])
@@ -615,7 +644,7 @@ def vigiar():
                     time.sleep(2)
                 except: pass 
                 
-                # --- PROCESSA AS AULAS DESTE PROFESSOR ---
+                # --- PROCESSA AS AULAS ---
                 for aula in minhas_aulas:
                     print(f"\n -> Iniciando Aula: {aula['turma']} ({aula['data']})")
                     relatorio_telegram += f"🏫 <b>{aula['turma']} ({aula['data']})</b>\n"
@@ -630,29 +659,17 @@ def vigiar():
                         try: navegador.switch_to.alert.accept()
                         except: pass
 
-                        # 🟢 SOLUÇÃO DO TIMEOUT (Botão Exibir) 🟢
-                        try:
-                            btn_exibir = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']")))
-                            navegador.execute_script("arguments[0].click();", btn_exibir)
-                            time.sleep(3)
-                        except:
-                            pass 
-                        # ----------------------------------------
+                        # Tenta clicar no botão Exibir usando a varredura blindada
+                        achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
+                        time.sleep(3)
 
-                        turma_planilha = aula['turma'].upper().strip()
-                        turma_curta = turma_planilha[:-2].strip() if turma_planilha.endswith(" A") or turma_planilha.endswith(" B") else turma_planilha
+                        # Usa o MAPA_TURMAS Restaurado
+                        turma_site = MAPA_TURMAS.get(aula['turma'].upper().strip(), aula['turma'])
+                        xpath_diario = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"
                         
-                        try:
-                            # Tenta primeiro com a letra (Ex: 8º ANO A)
-                            botao_diario = wait.until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_planilha}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_planilha}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]")))
-                        except:
-                            try:
-                                # Se falhar, tenta sem a letra (Ex: 8º ANO)
-                                botao_diario = wait.until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_curta}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_curta}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]")))
-                            except:
-                                raise Exception(f"As turmas '{turma_planilha}' ou '{turma_curta}' não foram achadas.")
-                        
-                        navegador.execute_script("arguments[0].click();", botao_diario) 
+                        if not achar_e_clicar(navegador, xpath_diario, tempo_espera=5):
+                            raise Exception(f"Turma '{turma_site}' não foi achada na tela.")
+                        time.sleep(5) 
                         
                         if aula['status_diario'] in ["Pendente", "Pendente_Nova"]:
                             try:
@@ -818,7 +835,7 @@ def vigiar():
                         if "Pendente" in aula['status_falta']: aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
                         relatorio_telegram += "  🚨 Falha geral ao abrir a turma no painel.\n"
 
-                # --- PROCESSA AS NOTAS DESTE PROFESSOR ---
+                # --- PROCESSA AS NOTAS ---
                 for nota in minhas_notas:
                     nota['etapa'] = etapa_atual
                     print(f"\n -> Iniciando Notas: {nota['nome_prova']} ({nota['turma']})")
@@ -833,31 +850,18 @@ def vigiar():
                         try: navegador.switch_to.alert.accept()
                         except: pass
 
-                        # 🟢 SOLUÇÃO DO TIMEOUT EM NOTAS (Botão Exibir) 🟢
-                        try:
-                            btn_exibir = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exibir') or text()='Exibir']")))
-                            navegador.execute_script("arguments[0].click();", btn_exibir)
-                            time.sleep(3)
-                        except:
-                            pass
-                        # -----------------------------------------------
+                        achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
+                        time.sleep(3)
 
-                        turma_planilha = nota['turma'].upper().strip()
-                        turma_curta = turma_planilha[:-2].strip() if turma_planilha.endswith(" A") or turma_planilha.endswith(" B") else turma_planilha
+                        turma_site = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'])
+                        xpath_notas = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
                         
-                        try:
-                            botao_notas = wait.until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_planilha}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_planilha}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]")))
-                        except:
-                            try:
-                                botao_notas = wait.until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_curta}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_curta}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]")))
-                            except:
-                                raise Exception(f"As turmas '{turma_planilha}' ou '{turma_curta}' não foram achadas.")
-                                
-                        navegador.execute_script("arguments[0].click();", botao_notas)
+                        if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
+                            raise Exception(f"Turma '{turma_site}' não foi achada na tela de notas.")
+                        time.sleep(6) 
                         
                         lancar_notas(navegador, wait, nota)
                         
-                        # Status atualiza na LINHA 3 agora
                         nota['aba'].update_cell(3, nota['coluna_planilha'], "Lançado")
                         print("   [Notas] ✅ Prova lançada com sucesso.")
                         relatorio_telegram += "  ✅ Prova lançada com sucesso.\n"
