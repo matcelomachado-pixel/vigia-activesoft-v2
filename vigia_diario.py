@@ -639,13 +639,20 @@ def vigiar():
                             pass 
                         # ----------------------------------------
 
-                        turma_site = aula['turma'].upper().strip()
+                        turma_planilha = aula['turma'].upper().strip()
+                        turma_curta = turma_planilha[:-2].strip() if turma_planilha.endswith(" A") or turma_planilha.endswith(" B") else turma_planilha
+                        
                         try:
-                            botao_diario = WebDriverWait(navegador, 15).until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]")))
-                            navegador.execute_script("arguments[0].click();", botao_diario)
-                        except: 
-                            raise Exception(f"Turma '{turma_site}' não foi achada na tela.")
-                        time.sleep(5) 
+                            # Tenta primeiro com a letra (Ex: 8º ANO A)
+                            botao_diario = wait.until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_planilha}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_planilha}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]")))
+                        except:
+                            try:
+                                # Se falhar, tenta sem a letra (Ex: 8º ANO)
+                                botao_diario = wait.until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_curta}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_curta}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]")))
+                            except:
+                                raise Exception(f"As turmas '{turma_planilha}' ou '{turma_curta}' não foram achadas.")
+                        
+                        navegador.execute_script("arguments[0].click();", botao_diario) 
                         
                         if aula['status_diario'] in ["Pendente", "Pendente_Nova"]:
                             try:
@@ -835,9 +842,18 @@ def vigiar():
                             pass
                         # -----------------------------------------------
 
-                        turma_site = nota['turma'].upper().strip()
-                        WebDriverWait(navegador, 20).until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"))).click()
-                        time.sleep(6) 
+                        turma_planilha = nota['turma'].upper().strip()
+                        turma_curta = turma_planilha[:-2].strip() if turma_planilha.endswith(" A") or turma_planilha.endswith(" B") else turma_planilha
+                        
+                        try:
+                            botao_notas = wait.until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_planilha}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_planilha}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]")))
+                        except:
+                            try:
+                                botao_notas = wait.until(EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{turma_curta}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_curta}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]")))
+                            except:
+                                raise Exception(f"As turmas '{turma_planilha}' ou '{turma_curta}' não foram achadas.")
+                                
+                        navegador.execute_script("arguments[0].click();", botao_notas)
                         
                         lancar_notas(navegador, wait, nota)
                         
