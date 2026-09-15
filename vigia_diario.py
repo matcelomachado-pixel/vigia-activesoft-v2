@@ -119,7 +119,7 @@ def rodar_lancamentos():
 
             for aba in abas_registros:
                 dados_aula = aba.get_all_records()
-                linhas_pendentes = [i + 2 for i, row in enumerate(dados_aula) if str(row.get('Status_Falta', '')).strip().upper() == 'PENDENTE']
+                linhas_pendentes = [i + 2 for i, row in enumerate(dados_aula) if str(row.get('Status_Falta', '')).strip().upper() == 'PENDENTE_NOVA']
                 
                 if not linhas_pendentes:
                     continue
