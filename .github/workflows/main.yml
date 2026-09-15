@@ -29,10 +29,9 @@ jobs:
       run: |
         echo "$GOOGLE_CREDS" > credenciais.json
 
-    - name: Rodar o Vigia
-      env:
-        SENHA_ACTIVESOFT: ${{ secrets.SENHA_ACTIVESOFT }}
-        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        python vigia_diario.py
+    - name: Executar Robôs do Assessor.IA
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: |
+          python vigia_scan.py
+          python vigia_diario.py
