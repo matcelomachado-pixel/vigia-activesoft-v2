@@ -48,21 +48,26 @@ JS_REACT_SETTER = """
 
 def avisar_telegram(chat_id, mensagem):
     token = os.environ.get("TELEGRAM_TOKEN")
-    if not token or not chat_id: return
+    if not token or not chat_id: 
+        return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": mensagem, "parse_mode": "HTML"}
-    try: requests.post(url, json=payload, timeout=10)
-    except: pass
+    try: 
+        requests.post(url, json=payload, timeout=10)
+    except: 
+        pass
 
 def mandar_print_telegram(chat_id, caminho_imagem, legenda=""):
     """ Câmera de Segurança do Robô """
     token = os.environ.get("TELEGRAM_TOKEN")
-    if not token or not chat_id: return
+    if not token or not chat_id: 
+        return
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
     try:
         with open(caminho_imagem, 'rb') as f:
             requests.post(url, data={"chat_id": chat_id, "caption": legenda}, files={"photo": f}, timeout=15)
-    except: pass
+    except: 
+        pass
 
 def conectar_sheets():
     creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", SCOPE) 
@@ -95,18 +100,22 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
             pass
     return False
 
-# ================= NOVA INTELIGÊNCIA DE LISTAS (O TRATOR) =================
+
+# ================= NOVAS FUNÇÕES DO TRATOR DE MENUS =================
 def traduzir_nome_para_activesoft(nome_sujo):
     match = re.search(r'(\d)([A-Z])$', nome_sujo.upper())
     if match:
         numero = match.group(1)
         letra = match.group(2)
-        if "FUNDAMENTAL" in nome_sujo.upper() or int(numero) > 5: return f"{numero}º ANO {letra}"
-        else: return f"{numero}ª SÉRIE {letra}"
+        if "FUNDAMENTAL" in nome_sujo.upper() or int(numero) > 5:
+            return f"{numero}º ANO {letra}"
+        else:
+            return f"{numero}ª SÉRIE {letra}"
     return nome_sujo
 
 def selecionar_dropdown_iframe(navegador, palavra_chave, texto_para_digitar):
     wait = WebDriverWait(navegador, 15)
+    
     def tentar_selecionar(driver):
         try:
             xpath_caixa = f"//label[contains(., '{palavra_chave}')]/following-sibling::div"
@@ -135,10 +144,13 @@ def selecionar_dropdown_iframe(navegador, palavra_chave, texto_para_digitar):
                 clicado = True
                 break
                     
-            if not clicado: driver.switch_to.active_element.send_keys(Keys.ENTER)
+            if not clicado:
+                driver.switch_to.active_element.send_keys(Keys.ENTER)
+                
             time.sleep(1.5)
             return True
-        except: return False
+        except:
+            return False
 
     navegador.switch_to.default_content()
     if tentar_selecionar(navegador): return True
@@ -150,6 +162,7 @@ def selecionar_dropdown_iframe(navegador, palavra_chave, texto_para_digitar):
             navegador.switch_to.frame(iframe)
             if tentar_selecionar(navegador): return True
         except: pass
+        
     return False
 
 
@@ -160,8 +173,10 @@ def lancar_ocorrencias(navegador, wait, aula):
         texto_ocorrencia = f"Não fez a tarefa: {aula['tarefa_nao_feita']}"
         numeros_alvo = [num.strip() for num in aula['nao_fez'].split(',')]
         
-        try: navegador.switch_to.default_content()
-        except: pass
+        try: 
+            navegador.switch_to.default_content()
+        except: 
+            pass
         time.sleep(2)
         
         botao_ocorrencias = wait.until(EC.element_to_be_clickable((By.ID, "ocorrencias_de_alunos")))
@@ -252,8 +267,10 @@ def lancar_ocorrencias(navegador, wait, aula):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_executar)
             time.sleep(1)
             navegador.execute_script("arguments[0].click();", botao_executar)
-            try: wait.until(EC.alert_is_present()).accept()
-            except: pass
+            try: 
+                wait.until(EC.alert_is_present()).accept()
+            except: 
+                pass
         except: pass
 
     except Exception as e: 
@@ -263,8 +280,8 @@ def lancar_ocorrencias(navegador, wait, aula):
         except: pass
 
 def lancar_faltas(navegador, wait, aula, etapa_atual):
-    """ Função unificada: Navegação blindada para listas + sua lógica original de tabela """
-    if aula['tipo_lancamento'] != "Pendente_Nova": return
+    if aula['tipo_lancamento'] != "Pendente_Nova": 
+        return
     
     faltas_str = str(aula.get('faltas', '')).strip()
 
@@ -282,19 +299,18 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             botao_freq = wait.until(EC.element_to_be_clickable((By.ID, "frequencia_em_lote")))
             navegador.execute_script("arguments[0].click();", botao_freq)
         except: 
-            navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/frequencia_lote/")
+            navegador.get("https://siga02.activesoft.com.br/diarios/frequencia_em_lote/")
         time.sleep(5)
         
-        # --- A NOVA SELEÇÃO MATADORA DE MENUS ---
+        # --- A ÚNICA ALTERAÇÃO FOI NESTE BLOCO (TRATOR DE MENUS) ---
         nome_turma_bonito = traduzir_nome_para_activesoft(aula['turma'])
-        
         selecionar_dropdown_iframe(navegador, "Fase", etapa_atual)
         sucesso_turma = selecionar_dropdown_iframe(navegador, "Turma", nome_turma_bonito)
         
         if not sucesso_turma:
             raise Exception(f"Não consegui selecionar a turma {nome_turma_bonito} via JavaScript.")
+        # -----------------------------------------------------------
         
-        # Preeche a data
         inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
         for input_dt in inps_data[:2]:
             try:
@@ -306,33 +322,18 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 time.sleep(0.5)
             except: pass
 
-        # Clica em Consultar
-        navegador.switch_to.default_content() 
-        clicou_consultar = False
-        for f in navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame"):
-            navegador.switch_to.default_content()
-            try:
-                navegador.switch_to.frame(f)
-                btn = wait.until(EC.presence_of_element_located((By.XPATH, "//button[normalize-space(text())='CONSULTAR'] | //button[normalize-space(text())='Consultar']")))
-                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
-                time.sleep(0.5)
-                navegador.execute_script("arguments[0].click();", btn)
-                clicou_consultar = True
-                break
-            except: pass
-            
-        if not clicou_consultar:
-            botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar' or normalize-space(text())='CONSULTAR']")))
-            navegador.execute_script("arguments[0].click();", botao_consultar)
-            
+        # --- A SUA LÓGICA ORIGINAL RESTAURADA ---
+        botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
+        navegador.execute_script("arguments[0].click();", botao_consultar)
         time.sleep(8) 
         
-        # --- A SUA LÓGICA DE TABELA INTACTA DAQUI PRA BAIXO ---
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
             time.sleep(0.5)
-            try: botao_alvo.click() 
-            except: navegador.execute_script("arguments[0].click();", botao_alvo) 
+            try: 
+                botao_alvo.click() 
+            except: 
+                navegador.execute_script("arguments[0].click();", botao_alvo) 
             time.sleep(1) 
             
             xpath = f"//*[normalize-space(text())='{texto_opcao}']"
@@ -345,7 +346,8 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     except: 
                         webdriver.ActionChains(navegador).move_to_element(op).click().perform()
                         return
-            if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
+            if opcoes: 
+                navegador.execute_script("arguments[0].click();", opcoes[-1])
 
         botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
         clicar_opcao_tabela(botao_selecione, "Presente")
