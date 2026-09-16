@@ -181,7 +181,7 @@ def lancar_ocorrencias(navegador, wait, aula):
             input_data.send_keys(Keys.BACKSPACE)
             input_data.send_keys(aula['data'])
             time.sleep(0.5)
-            input_data.send_keys(Keys.ENTER)  # <--- O Enter que tira o pop-up
+            input_data.send_keys(Keys.ENTER)  # Fecha o pop-up
             time.sleep(0.5)
             input_data.send_keys(Keys.ESCAPE)
         except: pass
@@ -243,23 +243,23 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             navegador.get("https://siga02.activesoft.com.br/diarios/frequencia_em_lote/")
         time.sleep(5)
         
-        turma_bruta = aula['turma'].upper()
-        curso = "FUNDAMENTAL" if "ANO" in turma_bruta else "MÉDIO"
+        # 🔥 A CORREÇÃO DE LÓGICA DO CURSO ESTÁ AQUI 🔥
+        # Primeiro a gente traduz o nome feio para um nome normal (Ex: 9º ANO A)
+        nome_turma_bonito = traduzir_nome_para_activesoft(aula['turma'])
+        
+        # Agora sim a gente avalia se é Fundamental ou Médio
+        curso = "FUNDAMENTAL" if "ANO" in nome_turma_bonito else "MÉDIO"
         
         serie_busca = ""
         for s in ["6", "7", "8", "9"]:
-            if s in turma_bruta: serie_busca = s 
+            if s in nome_turma_bonito: serie_busca = s 
         for s in ["1", "2", "3"]:
-            if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta: serie_busca = s
+            if f"{s} SÉRIE" in nome_turma_bonito or f"{s}ª SÉRIE" in nome_turma_bonito: serie_busca = s
             
         letra_turma = ""
-        partes = turma_bruta.split()
-        if partes[-1] in ["A", "B", "C", "D", "E"]:
-            letra_turma = partes[-1]
-        else:
-            match_letra = re.search(r'([A-E])$', turma_bruta)
-            if match_letra:
-                letra_turma = match_letra.group(1)
+        match_letra = re.search(r'([A-E])$', nome_turma_bonito)
+        if match_letra:
+            letra_turma = match_letra.group(1)
 
         # 🔥 A FUNÇÃO MATADORA DE MENUS COM LEITURA VISUAL 🔥
         def preencher_menu_cascata(idx, texto):
@@ -302,7 +302,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                             break
                         except: pass
                 
-                # 3. SE NÃO ACHAR VISUALMENTE: Apela para digitação (Ideal para Turmas)
+                # 3. SE NÃO ACHAR VISUALMENTE: Apela para digitação (Ideal para Turmas e Curso)
                 if not clicou:
                     navegador.execute_script("arguments[0].focus();", inp)
                     try:
@@ -439,7 +439,7 @@ def lancar_notas(navegador, wait, nota_info):
         
         clicou = False
         
-        # Lê a lista
+        # Lê a lista visualmente
         opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{nota_info['etapa']}')] | //li[contains(text(), '{nota_info['etapa']}')] | //span[contains(text(), '{nota_info['etapa']}')]")
         if opcoes: 
             for op in reversed(opcoes):
