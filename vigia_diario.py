@@ -316,23 +316,32 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         preencher_select_blindado(3, turma_exata)  
         preencher_select_blindado(5, etapa_atual)
         
+      # 🔥 CALENDÁRIO BLINDADO (Injeta e fecha o popup) 🔥
         try:
             inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
             if inps_data:
                 for input_dt in inps_data[:2]:
                     navegador.execute_script(JS_REACT_SETTER, input_dt, aula['data'])
                     time.sleep(0.5)
+                    # Golpe duplo: Enter e Esc para matar o pop-up
+                    try:
+                        input_dt.send_keys(Keys.ENTER)
+                        time.sleep(0.2)
+                        input_dt.send_keys(Keys.ESCAPE)
+                    except: pass
             else:
-                print("   [Frequência] ⚠️ Campos de data não encontrados na tela.")
-        except: pass
+                raise Exception("Campos de data não encontrados na tela.")
+        except Exception as e: 
+            raise Exception(f"Erro ao preencher a data: {e}")
 
+        # 🔥 CONSULTAR COM AVISO DE ERRO FATAL 🔥
         try:
             botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
             navegador.execute_script("arguments[0].click();", botao_consultar)
             print("   [Frequência] ⏳ Aguardando a tabela de alunos carregar...")
             time.sleep(8) 
         except:
-            print("   [Frequência] ⚠️ Não consegui clicar em 'Consultar'.")
+            raise Exception("O botão 'Consultar' estava bloqueado ou não apareceu.")
         
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
@@ -355,13 +364,14 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             
             if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
 
+        # 🔥 PRESENÇA COM AVISO DE ERRO FATAL 🔥
         try:
             botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
             clicar_opcao_tabela(botao_selecione, "Presente")
             print("   [Frequência] ✔️ Todos os alunos marcados como 'Presente'.")
             time.sleep(3) 
         except Exception as e: 
-            print(f"   [Frequência] ⚠️ Não foi possível marcar 'Presente' para todos. Erro: {str(e).split(';')[0]}")
+            raise Exception(f"A tabela de alunos não carregou. Falha ao marcar 'Presente'.")
             
         faltas_str = str(aula.get('faltas', '')).strip()
         if faltas_str:
@@ -377,8 +387,9 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     print(f"        ✔️ Falta cravada para o aluno Nº {num}")
                     time.sleep(1)
                 except Exception as erro_falta: 
-                    print(f"        ❌ Falha ao tentar marcar falta para o aluno Nº {num}. Erro: {str(erro_falta).split(';')[0]}")
+                    print(f"        ⚠️ Não achou o aluno {num} na tabela.") # Aqui pode passar se o aluno não existir
         
+        # 🔥 SALVAR COM AVISO DE ERRO FATAL 🔥
         try:
             botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
@@ -387,25 +398,33 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             time.sleep(3)
             try: wait.until(EC.alert_is_present()).accept()
             except: pass
+            
+            # Clicar em Confirmar ("Sim" ou "OK"), se houver
+            try:
+                botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm')]")))
+                navegador.execute_script("arguments[0].click();", botao_sim)
+                time.sleep(3)
+            except:
+                pass # Se o sistema já salvou direto e não pediu "Sim", está tudo bem.
+                
             print("   [Frequência] ✅ Chamada registrada e salva!")
-            
-            botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
-            navegador.execute_script("arguments[0].click();", botao_sim)
-            time.sleep(3)
         except:
-            print("   [Frequência] ⚠️ Botão de salvar não encontrado.")
+            raise Exception("Não consegui encontrar ou clicar no botão 'Salvar'. A tela pode estar bloqueada.")
             
+        # Verificador de aviso vermelho de erro do Activesoft
         try:
             erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
             if erro_swal and erro_swal[0].is_displayed():
                 titulo_erro = navegador.find_element(By.ID, "swal2-title").text
                 navegador.execute_script("arguments[0].click();", navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]"))
-                raise Exception(f"Sistema recusou salvar: {titulo_erro}")
+                raise Exception(f"O Activesoft recusou salvar e exibiu o aviso: {titulo_erro}")
         except Exception as e_swal:
-            if "Sistema recusou salvar" in str(e_swal): raise e_swal
+            if "Activesoft recusou" in str(e_swal): raise e_swal
             
-    except Exception as e: print(f"   [Frequência] ⚠️ Erro crítico: {e}")
+    except Exception as e: 
+        raise Exception(f"Falha na Frequência: {e}")
 
+# (Daqui pra baixo continua a função lancar_notas...)
 def lancar_notas(navegador, wait, nota_info):
     input_escondido = None
     for tentativa in range(12):
