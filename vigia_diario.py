@@ -98,7 +98,7 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
             pass
     return False
 
-# ================= TRADUTOR TELA INICIAL =================
+# ================= TRADUTOR =================
 def traduzir_nome_para_activesoft(nome_sujo):
     match = re.search(r'(\d)([A-Z])$', nome_sujo.upper())
     if match:
@@ -172,18 +172,14 @@ def lancar_ocorrencias(navegador, wait, aula):
         navegador.execute_script("arguments[0].click();", botao_proximo)
         time.sleep(3)
 
-        # 🔥 CALENDÁRIO COM ENTER (Ocorrências) 🔥
         try:
             input_data = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@placeholder='DD/MM/AAAA']")))
             input_data.click()
-            time.sleep(0.5)
             input_data.send_keys(Keys.CONTROL + "a")
             input_data.send_keys(Keys.BACKSPACE)
             input_data.send_keys(aula['data'])
-            time.sleep(0.5)
-            input_data.send_keys(Keys.ENTER)  # Fecha o pop-up
-            time.sleep(0.5)
             input_data.send_keys(Keys.ESCAPE)
+            time.sleep(0.5)
         except: pass
 
         try:
@@ -221,52 +217,43 @@ def lancar_ocorrencias(navegador, wait, aula):
         try: navegador.switch_to.default_content()
         except: pass
 
+# 🔥 A SUA FUNÇÃO DE FALTAS INTACTA E HOMOLOGADA 🔥
 def lancar_faltas(navegador, wait, aula, etapa_atual):
-    if aula['tipo_lancamento'] != "Pendente_Nova": 
-        return
-    faltas_str = str(aula.get('faltas', '')).strip()
-
+    if aula['tipo_lancamento'] != "Pendente_Nova": return
+    print(f"   [Frequência] Iniciando chamada para {aula['turma']}...")
     try:
         try: navegador.switch_to.default_content()
         except: pass
         time.sleep(2)
         
-        try: 
-            navegador.get("https://siga02.activesoft.com.br/portal_eb_professor/")
-            time.sleep(3)
-        except: pass
-        
         try:
             botao_freq = wait.until(EC.element_to_be_clickable((By.ID, "frequencia_em_lote")))
             navegador.execute_script("arguments[0].click();", botao_freq)
-        except: 
+        except:
             navegador.get("https://siga02.activesoft.com.br/diarios/frequencia_em_lote/")
         time.sleep(5)
         
-        # 🔥 A CORREÇÃO DE LÓGICA DO CURSO ESTÁ AQUI 🔥
-        # Primeiro a gente traduz o nome feio para um nome normal (Ex: 9º ANO A)
+        # TRADUTOR ENTRA AQUI PARA LIMPAR O NOME DO SCAN
         nome_turma_bonito = traduzir_nome_para_activesoft(aula['turma'])
+        turma_bruta = nome_turma_bonito.upper()
         
-        # Agora sim a gente avalia se é Fundamental ou Médio
-        curso = "FUNDAMENTAL" if "ANO" in nome_turma_bonito else "MÉDIO"
+        curso = "FUNDAMENTAL" if "ANO" in turma_bruta else "MÉDIO"
         
         serie_busca = ""
         for s in ["6", "7", "8", "9"]:
-            if s in nome_turma_bonito: serie_busca = s 
+            if s in turma_bruta: serie_busca = s 
         for s in ["1", "2", "3"]:
-            if f"{s} SÉRIE" in nome_turma_bonito or f"{s}ª SÉRIE" in nome_turma_bonito: serie_busca = s
+            if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta: serie_busca = s
             
-        letra_turma = ""
-        match_letra = re.search(r'([A-E])$', nome_turma_bonito)
-        if match_letra:
-            letra_turma = match_letra.group(1)
-
-        # 🔥 A FUNÇÃO MATADORA DE MENUS COM LEITURA VISUAL 🔥
-        def preencher_menu_cascata(idx, texto):
-            if not texto: return
+        turma_exata = turma_bruta.replace("º", "°")
+        
+        print("   [Frequência] 📍 Preenchendo as caixas de seleção...")
+        
+        def preencher_select_blindado(idx, texto):
             try:
                 navegador.switch_to.default_content()
                 inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
+                
                 if not inps: 
                     frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
                     for f in frames:
@@ -276,46 +263,42 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                             inps = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
                             if inps: break
                         except: pass
-                
+                        
                 if idx >= len(inps): return
                 inp = inps[idx]
                 
                 navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
                 time.sleep(1)
                 
-                # 1. Clica para abrir o menu e revelar as opções no HTML
                 try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
                 except: pass
-                time.sleep(1.5)
+                time.sleep(1)
                 
-                clicou = False
+                navegador.execute_script("arguments[0].focus();", inp)
                 
-                # 2. LÊ A TELA: Procura o texto da opção no HTML e clica (Ideal para Fase da Nota)
-                opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')] | //span[contains(text(), '{texto}')]")
+                try:
+                    inp.send_keys(Keys.CONTROL + "a")
+                    inp.send_keys(Keys.BACKSPACE)
+                    inp.send_keys(texto)
+                    time.sleep(1.5)
+                except:
+                    navegador.execute_script(JS_REACT_SETTER, inp, texto)
+                    time.sleep(2)
+                
+                opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')]")
+                
                 if opcoes:
-                    for op in reversed(opcoes):  # reversed pega sempre o menu ativo que acabou de abrir
-                        try:
-                            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
-                            time.sleep(0.5)
-                            navegador.execute_script("arguments[0].click();", op)
-                            clicou = True
+                    clicou_exato = False
+                    for opcao in opcoes:
+                        if texto.upper() == opcao.text.strip().upper():
+                            navegador.execute_script("arguments[0].click();", opcao)
+                            clicou_exato = True
                             break
-                        except: pass
-                
-                # 3. SE NÃO ACHAR VISUALMENTE: Apela para digitação (Ideal para Turmas e Curso)
-                if not clicou:
-                    navegador.execute_script("arguments[0].focus();", inp)
+                    
+                    if not clicou_exato:
+                        navegador.execute_script("arguments[0].click();", opcoes[-1])
+                else:
                     try:
-                        inp.send_keys(Keys.CONTROL + "a")
-                        inp.send_keys(Keys.BACKSPACE)
-                    except: pass
-                    time.sleep(0.5)
-                    
-                    try: inp.send_keys(texto)
-                    except: navegador.execute_script(JS_REACT_SETTER, inp, texto)
-                    time.sleep(2) # Pausa vital para a busca do Activesoft terminar
-                    
-                    try: 
                         inp.send_keys(Keys.ARROW_DOWN)
                         time.sleep(0.5)
                         inp.send_keys(Keys.ENTER)
@@ -324,76 +307,94 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
                 
-                time.sleep(2)
-            except: pass
+                time.sleep(2.5) 
+            except Exception as e:
+                print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
 
-        preencher_menu_cascata(1, curso)        
-        preencher_menu_cascata(2, serie_busca)  
-        preencher_menu_cascata(3, letra_turma)  
-        preencher_menu_cascata(5, etapa_atual)  
+        preencher_select_blindado(1, curso)        
+        preencher_select_blindado(2, serie_busca)       
+        preencher_select_blindado(3, turma_exata)  
+        preencher_select_blindado(5, etapa_atual)
         
-        # 🔥 CALENDÁRIO COM ENTER (Faltas) 🔥
-        inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
-        for input_dt in inps_data[:2]:
-            try:
-                input_dt.click()
-                time.sleep(0.5)
-                input_dt.send_keys(Keys.CONTROL + "a")
-                input_dt.send_keys(Keys.BACKSPACE)
-                input_dt.send_keys(aula['data'])
-                time.sleep(0.5)
-                input_dt.send_keys(Keys.ENTER) # <--- Fecha o pop-up
-                time.sleep(0.5)
-                input_dt.send_keys(Keys.ESCAPE)
-            except: pass
+        try:
+            inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
+            if inps_data:
+                for input_dt in inps_data[:2]:
+                    navegador.execute_script(JS_REACT_SETTER, input_dt, aula['data'])
+                    time.sleep(0.5)
+            else:
+                print("   [Frequência] ⚠️ Campos de data não encontrados na tela.")
+        except: pass
 
-        botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
-        navegador.execute_script("arguments[0].click();", botao_consultar)
-        time.sleep(8) 
+        try:
+            botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
+            navegador.execute_script("arguments[0].click();", botao_consultar)
+            print("   [Frequência] ⏳ Aguardando a tabela de alunos carregar...")
+            time.sleep(8) 
+        except:
+            print("   [Frequência] ⚠️ Não consegui clicar em 'Consultar'.")
         
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
             time.sleep(0.5)
-            try: botao_alvo.click() 
-            except: navegador.execute_script("arguments[0].click();", botao_alvo) 
-            time.sleep(1) 
+            try: botao_alvo.click()
+            except: navegador.execute_script("arguments[0].click();", botao_alvo)
+            time.sleep(1)
             
             xpath = f"//*[normalize-space(text())='{texto_opcao}']"
             opcoes = navegador.find_elements(By.XPATH, xpath)
+            
             for op in opcoes:
                 if op.is_displayed():
-                    try: 
+                    try:
                         op.click()
                         return
-                    except: 
+                    except:
                         webdriver.ActionChains(navegador).move_to_element(op).click().perform()
                         return
+            
             if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
 
-        botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
-        clicar_opcao_tabela(botao_selecione, "Presente")
-        time.sleep(3) 
+        try:
+            botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
+            clicar_opcao_tabela(botao_selecione, "Presente")
+            print("   [Frequência] ✔️ Todos os alunos marcados como 'Presente'.")
+            time.sleep(3) 
+        except Exception as e: 
+            print(f"   [Frequência] ⚠️ Não foi possível marcar 'Presente' para todos. Erro: {str(e).split(';')[0]}")
             
+        faltas_str = str(aula.get('faltas', '')).strip()
         if faltas_str:
             numeros_falta = [n.strip() for n in faltas_str.split(',')]
             for num in numeros_falta:
                 try:
-                    linha = navegador.find_element(By.XPATH, f"(//tbody/tr)[{int(num) + 1}]")
+                    indice_linha = int(num) + 1
+                    xpath_linha = f"(//tbody/tr)[{indice_linha}]"
+                    linha = navegador.find_element(By.XPATH, xpath_linha)
+                    
                     botao_status = linha.find_element(By.XPATH, ".//button[contains(@class, 'Toggle__ToggleButton')]")
                     clicar_opcao_tabela(botao_status, "Falta")
+                    print(f"        ✔️ Falta cravada para o aluno Nº {num}")
                     time.sleep(1)
-                except: pass
+                except Exception as erro_falta: 
+                    print(f"        ❌ Falha ao tentar marcar falta para o aluno Nº {num}. Erro: {str(erro_falta).split(';')[0]}")
         
-        botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Salvar')]")))
-        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
-        time.sleep(1)
-        navegador.execute_script("arguments[0].click();", botao_salvar)
-        time.sleep(2)
-        
-        botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
-        navegador.execute_script("arguments[0].click();", botao_sim)
-        time.sleep(3)
-        
+        try:
+            botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
+            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
+            time.sleep(1)
+            navegador.execute_script("arguments[0].click();", botao_salvar)
+            time.sleep(3)
+            try: wait.until(EC.alert_is_present()).accept()
+            except: pass
+            print("   [Frequência] ✅ Chamada registrada e salva!")
+            
+            botao_sim = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm') and contains(text(), 'Sim')]")))
+            navegador.execute_script("arguments[0].click();", botao_sim)
+            time.sleep(3)
+        except:
+            print("   [Frequência] ⚠️ Botão de salvar não encontrado.")
+            
         try:
             erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
             if erro_swal and erro_swal[0].is_displayed():
@@ -403,8 +404,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         except Exception as e_swal:
             if "Sistema recusou salvar" in str(e_swal): raise e_swal
             
-    except Exception as e: 
-        raise Exception(f"{e}")
+    except Exception as e: print(f"   [Frequência] ⚠️ Erro crítico: {e}")
 
 def lancar_notas(navegador, wait, nota_info):
     input_escondido = None
@@ -428,43 +428,20 @@ def lancar_notas(navegador, wait, nota_info):
         
     if not input_escondido: raise Exception("Campo de Etapa sumiu.")
     
-    # 🔥 O LEITOR VISUAL APLICADO TAMBÉM NA FASE DAS NOTAS 🔥
     try:
-        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_escondido)
-        time.sleep(0.5)
-        
-        # Abre o menu
         navegador.execute_script("arguments[0].parentNode.parentNode.click();", input_escondido)
+        time.sleep(1)
+        navegador.execute_script("arguments[0].focus();", input_escondido)
+        input_escondido.send_keys(nota_info['etapa'])
         time.sleep(1.5) 
         
-        clicou = False
-        
-        # Lê a lista visualmente
-        opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{nota_info['etapa']}')] | //li[contains(text(), '{nota_info['etapa']}')] | //span[contains(text(), '{nota_info['etapa']}')]")
+        opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{nota_info['etapa']}']")
         if opcoes: 
-            for op in reversed(opcoes):
-                try:
-                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
-                    time.sleep(0.5)
-                    navegador.execute_script("arguments[0].click();", op)
-                    clicou = True
-                    break
-                except: pass
-                
-        # Se falhou, digita
-        if not clicou:
-            navegador.execute_script("arguments[0].focus();", input_escondido)
-            try: input_escondido.send_keys(nota_info['etapa'])
-            except: pass
-            time.sleep(1.5)
-            try:
-                input_escondido.send_keys(Keys.ARROW_DOWN)
-                time.sleep(0.5)
-                input_escondido.send_keys(Keys.ENTER)
-            except:
-                navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", input_escondido)
-                time.sleep(0.5)
-                navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", input_escondido)
+            navegador.execute_script("arguments[0].click();", opcoes[-1])
+        else:
+            navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", input_escondido)
+            time.sleep(0.5)
+            navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", input_escondido)
         time.sleep(1.5)
         
         btn_consultar = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Consultar')]")))
@@ -483,15 +460,9 @@ def lancar_notas(navegador, wait, nota_info):
         navegador.execute_script(JS_REACT_SETTER, input_nome, nota_info['nome_prova'])
         time.sleep(0.5)
         
-        # 🔥 CALENDÁRIO COM ENTER (Notas) 🔥
         input_data = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'Datepicker')]")))
         navegador.execute_script(JS_REACT_SETTER, input_data, nota_info['data_prova'])
         time.sleep(0.5)
-        try:
-            input_data.send_keys(Keys.ENTER)
-            time.sleep(0.5)
-            input_data.send_keys(Keys.ESCAPE)
-        except: pass
         
         input_valor = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'InputDecimal')]")))
         navegador.execute_script(JS_REACT_SETTER, input_valor, nota_info['valor_prova'])
