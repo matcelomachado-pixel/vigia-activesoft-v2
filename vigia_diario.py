@@ -220,7 +220,8 @@ def lancar_ocorrencias(navegador, wait, aula):
         try: navegador.switch_to.default_content()
         except: pass
 
-# 🔥 A FUNÇÃO DE FALTAS COM A CORREÇÃO DE STRINGS 🔥
+
+# 🔥 A FUNÇÃO DE FALTAS BLINDADA COM RESPIRO DE SERVIDOR 🔥
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": return
     print(f"   [Frequência] Iniciando chamada para {aula['turma']}...")
@@ -236,13 +237,11 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             navegador.get("https://siga02.activesoft.com.br/diarios/frequencia_em_lote/")
         time.sleep(5)
         
-        # TRADUTOR ENTRA AQUI PARA LIMPAR O NOME DO SCAN
         nome_turma_bonito = traduzir_nome_para_activesoft(aula['turma'])
         turma_bruta = nome_turma_bonito.upper().replace("º", "°")
         
         curso = "FUNDAMENTAL" if "ANO" in turma_bruta else "MÉDIO"
         
-        # 🔥 A CORREÇÃO DE PRECISÃO ESTÁ AQUI 🔥
         serie_busca = ""
         if curso == "FUNDAMENTAL":
             match_s = re.search(r'(\d+)°?\s*ANO', turma_bruta)
@@ -251,7 +250,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             match_s = re.search(r'(\d+)ª?\s*S[EÉ]RIE', turma_bruta)
             if match_s: serie_busca = f"{match_s.group(1)}ª SÉRIE"
             
-        # Fallback de segurança se falhar
         if not serie_busca:
             for s in ["6", "7", "8", "9", "1", "2", "3"]:
                 if s in turma_bruta: serie_busca = s
@@ -291,13 +289,17 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')] | //span[contains(text(), '{texto}')]")
                 if opcoes:
                     for op in reversed(opcoes):
-                        try:
-                            navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
-                            time.sleep(0.5)
-                            navegador.execute_script("arguments[0].click();", op)
-                            clicou = True
-                            break
-                        except: pass
+                        if op.is_displayed():
+                            try:
+                                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
+                                time.sleep(0.5)
+                                try:
+                                    op.click()
+                                except:
+                                    webdriver.ActionChains(navegador).move_to_element(op).click().perform()
+                                clicou = True
+                                break
+                            except: pass
                 
                 if not clicou:
                     navegador.execute_script("arguments[0].focus();", inp)
@@ -320,13 +322,33 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
                 
+                time.sleep(1)
+                
+                # 🔥 O PLANO B: SE A TURMA FALHAR, FORÇA A PRIMEIRA DA LISTA 🔥
+                if idx == 3:
+                    try:
+                        container = inp.find_element(By.XPATH, "../../..")
+                        if "Selecione" in container.text:
+                            print("   [Frequência] ⚠️ Texto não casou. Forçando a primeira Turma disponível...")
+                            inp.send_keys(Keys.CONTROL + "a")
+                            inp.send_keys(Keys.BACKSPACE)
+                            time.sleep(1)
+                            inp.send_keys(Keys.ARROW_DOWN)
+                            time.sleep(0.5)
+                            inp.send_keys(Keys.ENTER)
+                    except: pass
+                    
                 time.sleep(2)
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
 
-        preencher_select_blindado(1, curso)        
-        preencher_select_blindado(2, serie_busca)       
+        # Execução das caixas com "Respiro" pro servidor Activesoft
+        preencher_select_blindado(1, curso)
+        time.sleep(2)
+        preencher_select_blindado(2, serie_busca)
+        time.sleep(4) # Espera a engrenagem do Activesoft carregar as turmas
         preencher_select_blindado(3, turma_exata)  
+        time.sleep(2)
         preencher_select_blindado(5, etapa_atual)
         
         try:
@@ -463,13 +485,17 @@ def lancar_notas(navegador, wait, nota_info):
         opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{nota_info['etapa']}')] | //li[contains(text(), '{nota_info['etapa']}')] | //span[contains(text(), '{nota_info['etapa']}')]")
         if opcoes: 
             for op in reversed(opcoes):
-                try:
-                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
-                    time.sleep(0.5)
-                    navegador.execute_script("arguments[0].click();", op)
-                    clicou = True
-                    break
-                except: pass
+                if op.is_displayed():
+                    try:
+                        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
+                        time.sleep(0.5)
+                        try:
+                            op.click()
+                        except:
+                            webdriver.ActionChains(navegador).move_to_element(op).click().perform()
+                        clicou = True
+                        break
+                    except: pass
                 
         if not clicou:
             navegador.execute_script("arguments[0].focus();", input_escondido)
