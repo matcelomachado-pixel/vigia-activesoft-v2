@@ -143,7 +143,7 @@ def construir_banco_de_dados():
             tentativas_sem_novos_alunos = 0
             total_alunos_anterior = 0
             
-            while limite_scrolls < 50: # Trava de no máximo 50 rolagens
+            while limite_scrolls < 50:
                 limite_scrolls += 1
                 linhas = buscar_linhas_tabela(navegador)
                 
@@ -158,34 +158,55 @@ def construir_banco_de_dados():
                         numero = ""
                         nome_aluno = ""
                         
+                        # Variáveis para guardar o "DNA" real do Activesoft
+                        curso_ativo = ""
+                        serie_ativo = ""
+                        turma_ativa = ""
+                        
                         for td in tds:
                             txt = td.text.strip()
                             if not txt: continue
                             txt_upper = txt.upper()
                             
-                            # 1. É a TURMA? (Tem ANO/SÉRIE e obrigatoriamente tem NÚMERO como 6, 7, 8, 9, 1, 2026)
-                            if ("ANO" in txt_upper or "SÉRIE" in txt_upper or "SERIE" in txt_upper) and any(c.isdigit() for c in txt_upper):
+                            # 1. É a TURMA? (Tem barra '/' separando as infos)
+                            if "/" in txt_upper and ("ANO" in txt_upper or "SÉRIE" in txt_upper or "SERIE" in txt_upper or "EM" in txt_upper):
+                                partes = [p.strip() for p in txt_upper.split("/")]
+                                if len(partes) >= 3:
+                                    curso_ativo = partes[0]
+                                    serie_ativo = partes[1]
+                                    turma_ativa = partes[-1] # A última parte é sempre a turma (Ex: 8° ANO A)
+                                    texto_turma = turma_ativa
+                            
+                            # Fallback de segurança se não houver barras na escola
+                            elif ("ANO" in txt_upper or "SÉRIE" in txt_upper or "SERIE" in txt_upper) and any(c.isdigit() for c in txt_upper) and not texto_turma:
                                 texto_turma = txt_upper
+                                curso_ativo = "MÉDIO" if "SÉRIE" in txt_upper else "FUNDAMENTAL"
+                                serie_ativo = txt_upper
+                                turma_ativa = txt_upper
                                 
-                            # 2. É o NÚMERO de chamada? (É composto apenas por dígitos numéricos)
+                            # 2. É o NÚMERO de chamada?
                             elif txt.isdigit() and not numero:
                                 numero = txt
                                 
-                            # 3. É o NOME do aluno? (Não tem números, tem espaço separando nome/sobrenome)
+                            # 3. É o NOME do aluno?
                             elif len(txt) > 5 and not any(c.isdigit() for c in txt_upper) and " " in txt_upper and not nome_aluno:
                                 nome_aluno = txt.title()
                                 
                         if texto_turma and nome_aluno:
                             if texto_turma not in turmas_coletadas:
-                                turmas_coletadas[texto_turma] = []
-                            # Adiciona só se o aluno ainda não existir na turma
-                            if not any(a['nome'] == nome_aluno for a in turmas_coletadas[texto_turma]):
-                                turmas_coletadas[texto_turma].append({"n": numero, "nome": nome_aluno})
+                                turmas_coletadas[texto_turma] = {
+                                    "curso": curso_ativo,
+                                    "serie": serie_ativo,
+                                    "turma": turma_ativa,
+                                    "alunos": []
+                                }
+                            
+                            if not any(a['nome'] == nome_aluno for a in turmas_coletadas[texto_turma]["alunos"]):
+                                turmas_coletadas[texto_turma]["alunos"].append({"n": numero, "nome": nome_aluno})
                     except: pass
                 
-                total_atual = sum(len(alunos) for alunos in turmas_coletadas.values())
+                total_atual = sum(len(dados["alunos"]) for dados in turmas_coletadas.values())
                 
-                # Verifica se a rolagem trouxe alunos novos
                 if total_atual == total_alunos_anterior and total_atual > 0:
                     tentativas_sem_novos_alunos += 1
                     if tentativas_sem_novos_alunos >= 3:
@@ -195,12 +216,11 @@ def construir_banco_de_dados():
                     tentativas_sem_novos_alunos = 0
                     total_alunos_anterior = total_atual
                 
-                # Executa a rolagem (Scroll) para o final da tabela!
                 try:
                     if linhas:
                         print(f" -> Rolando a página para baixo... (Lidos até agora: {total_atual})")
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'end'});", linhas[-1])
-                        time.sleep(4) # Espera 4 segs para o Activesoft processar o carregamento
+                        time.sleep(4) 
                 except: 
                     time.sleep(3)
 
@@ -211,7 +231,12 @@ def construir_banco_de_dados():
                 raise Exception("Tabela carregou vazia (0 alunos).")
 
             print(" -> Criando Banco de Dados no Google Sheets...")
-            for turma_nome, alunos in turmas_coletadas.items():
+            for turma_nome, dados in turmas_coletadas.items():
+                alunos = dados["alunos"]
+                curso = dados["curso"]
+                serie = dados["serie"]
+                turma = dados["turma"]
+                
                 turma_limpa = limpar_nome_aba(turma_nome)
                 
                 nome_aba_alunos = f"alunos_{turma_limpa}"
@@ -224,11 +249,21 @@ def construir_banco_de_dados():
                 ws_al.update([df_alunos.columns.values.tolist()] + df_alunos.values.tolist())
                 
                 nome_aba_reg = f"registos_{turma_limpa}"
-                colunas_reg = ["Data", "Resumo", "Para Casa", "Faltas", "Nao_Fez", "Tarefa_Nao_Feita", "Advertencias", "Destaques", "Status_Diario", "Status_Ocorrencia", "Status_Falta", "ID_Professor"]
-                try: planilha.worksheet(nome_aba_reg)
+                colunas_reg = ["Data", "Resumo", "Para Casa", "Faltas", "Nao_Fez", "Tarefa_Nao_Feita", "Advertencias", "Destaques", "Status_Diario", "Status_Ocorrencia", "Status_Falta", "ID_Professor", "CURSO_ACTIVESOFT", "SERIE_ACTIVESOFT", "TURMA_ACTIVESOFT"]
+                
+                try: 
+                    ws_reg = planilha.worksheet(nome_aba_reg)
                 except:
                     ws_reg = planilha.add_worksheet(title=nome_aba_reg, rows="100", cols="15")
                     ws_reg.update([colunas_reg])
+                
+                # 🔥 O PULO DO GATO: Escrevendo os nomes oficiais do Activesoft direto na planilha 🔥
+                ws_reg.update_cell(1, 13, "CURSO_ACTIVESOFT")
+                ws_reg.update_cell(1, 14, "SERIE_ACTIVESOFT")
+                ws_reg.update_cell(1, 15, "TURMA_ACTIVESOFT")
+                ws_reg.update_cell(2, 13, curso)
+                ws_reg.update_cell(2, 14, serie)
+                ws_reg.update_cell(2, 15, turma)
 
                 nome_aba_notas = f"Notas_{turma_limpa}"
                 try: planilha.worksheet(nome_aba_notas)
@@ -240,7 +275,7 @@ def construir_banco_de_dados():
 
             aba_usuarios.update_cell(prof['linha'], 8, "CONCLUIDO")
             
-            msg_final = f"✅ **Banco de Dados Construído!**\n\nEu entrei no seu Activesoft e mapeei:\n🏫 **{total_turmas} Turmas**\n👥 **{total_atual} Alunos**\n\nTodas as abas foram criadas com o nome oficial."
+            msg_final = f"✅ **Banco de Dados Construído!**\n\nEu entrei no seu Activesoft e mapeei:\n🏫 **{total_turmas} Turmas**\n👥 **{total_atual} Alunos**\n\nAgora o meu Vigia possui a colinha de navegação exata do Activesoft!"
             avisar_telegram(prof['chat_id'], msg_final)
 
         except Exception as e:
