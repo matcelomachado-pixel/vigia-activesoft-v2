@@ -207,7 +207,6 @@ def lancar_ocorrencias(navegador, wait, aula):
         try: navegador.switch_to.default_content()
         except: pass
 
-# 🔥 A SUA FUNÇÃO EXATA, COM A NOSSA INJEÇÃO DE DNA 🔥
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": return
     
@@ -537,7 +536,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V42 (MAPA CORRIGIDO E DNA INJETADO)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V43 (FILTRO TEMPORAL AUTO-HEALING)")
     print("="*60)
     
     try:
@@ -609,6 +608,16 @@ def vigiar():
                 if not data_aula: 
                     continue
                 
+                # 🔥 FILTRO DO TEMPO: AUTO-CORREÇÃO DE ANO 🔥
+                # Se o Telegram bot mandar 2024, ele conserta para o ano corrente antes de enviar
+                if "/" in data_aula:
+                    partes_data = data_aula.split("/")
+                    if len(partes_data) == 3:
+                        ano_atual = str(datetime.now().year)
+                        if partes_data[2] != ano_atual:
+                            partes_data[2] = ano_atual
+                            data_aula = "/".join(partes_data)
+                
                 st_diario = str(row[col_diario]).strip() if col_diario != -1 else ""
                 st_ocor = str(row[col_ocorrencia]).strip() if col_ocorrencia != -1 else ""
                 st_falta = str(row[col_falta]).strip() if col_falta != -1 else ""
@@ -648,6 +657,16 @@ def vigiar():
                     id_prof = str(dados[1][col_idx]).strip()
                     if not id_prof: 
                         continue
+                        
+                    # 🔥 FILTRO DO TEMPO PARA NOTAS TAMBÉM 🔥
+                    data_prova_crua = str(dados[3][col_idx]).strip()
+                    if "/" in data_prova_crua:
+                        partes_data_prova = data_prova_crua.split("/")
+                        if len(partes_data_prova) == 3:
+                            ano_atual_prova = str(datetime.now().year)
+                            if partes_data_prova[2] != ano_atual_prova:
+                                partes_data_prova[2] = ano_atual_prova
+                                data_prova_crua = "/".join(partes_data_prova)
                     
                     notas_alunos = {}
                     for row_idx in range(5, len(dados)):
@@ -661,7 +680,7 @@ def vigiar():
                         
                     notas_por_prof[id_prof].append({
                         "aba": aba, "turma": turma_nome, "coluna_planilha": col_idx + 1,
-                        "nome_prova": str(dados[0][col_idx]).strip(), "data_prova": str(dados[3][col_idx]).strip(),
+                        "nome_prova": str(dados[0][col_idx]).strip(), "data_prova": data_prova_crua,
                         "valor_prova": str(dados[4][col_idx]).strip(), "notas_alunos": notas_alunos
                     })
 
@@ -735,7 +754,6 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        # 🔥 A MÁGICA FINAL: Procura pela aba e pelo DNA para não falhar nunca mais! 🔥
                         turma_busca = MAPA_TURMAS.get(aula['turma'].upper().strip())
                         if not turma_busca:
                             turma_busca = MAPA_TURMAS.get(aula['turma_ativa'].upper().strip(), aula['turma_ativa'].upper().strip())
