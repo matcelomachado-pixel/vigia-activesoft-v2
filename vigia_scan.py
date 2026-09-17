@@ -248,7 +248,7 @@ def construir_banco_de_dados():
                 except: ws_al = planilha.add_worksheet(title=nome_aba_alunos, rows="100", cols="5")
                 ws_al.update([df_alunos.columns.values.tolist()] + df_alunos.values.tolist())
                 
-                nome_aba_reg = f"registros_{turma_limpa}"
+                nome_aba_reg = f"registos_{turma_limpa}"
                 colunas_reg = ["Data", "Resumo", "Para Casa", "Faltas", "Nao_Fez", "Tarefa_Nao_Feita", "Advertencias", "Destaques", "Status_Diario", "Status_Ocorrencia", "Status_Falta", "ID_Professor", "CURSO_ACTIVESOFT", "SERIE_ACTIVESOFT", "TURMA_ACTIVESOFT"]
                 
                 try: 
