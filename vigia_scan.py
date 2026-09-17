@@ -158,7 +158,6 @@ def construir_banco_de_dados():
                         numero = ""
                         nome_aluno = ""
                         
-                        # Variáveis para guardar o "DNA" real do Activesoft
                         curso_ativo = ""
                         serie_ativo = ""
                         turma_ativa = ""
@@ -174,7 +173,7 @@ def construir_banco_de_dados():
                                 if len(partes) >= 3:
                                     curso_ativo = partes[0]
                                     serie_ativo = partes[1]
-                                    turma_ativa = partes[-1] # A última parte é sempre a turma (Ex: 8° ANO A)
+                                    turma_ativa = partes[-1] 
                                     texto_turma = turma_ativa
                             
                             # Fallback de segurança se não houver barras na escola
@@ -230,7 +229,8 @@ def construir_banco_de_dados():
             if total_turmas == 0:
                 raise Exception("Tabela carregou vazia (0 alunos).")
 
-            print(" -> Criando Banco de Dados no Google Sheets...")
+            print(" -> Criando Banco de Dados no Google Sheets (Com controle de limite da API)...")
+            
             for turma_nome, dados in turmas_coletadas.items():
                 alunos = dados["alunos"]
                 curso = dados["curso"]
@@ -248,7 +248,8 @@ def construir_banco_de_dados():
                 except: ws_al = planilha.add_worksheet(title=nome_aba_alunos, rows="100", cols="5")
                 ws_al.update([df_alunos.columns.values.tolist()] + df_alunos.values.tolist())
                 
-                nome_aba_reg = f"registos_{turma_limpa}"
+                # 🔥 NOME BRASILEIRO (REGISTROS) 🔥
+                nome_aba_reg = f"registros_{turma_limpa}"
                 colunas_reg = ["Data", "Resumo", "Para Casa", "Faltas", "Nao_Fez", "Tarefa_Nao_Feita", "Advertencias", "Destaques", "Status_Diario", "Status_Ocorrencia", "Status_Falta", "ID_Professor", "CURSO_ACTIVESOFT", "SERIE_ACTIVESOFT", "TURMA_ACTIVESOFT"]
                 
                 try: 
@@ -257,13 +258,17 @@ def construir_banco_de_dados():
                     ws_reg = planilha.add_worksheet(title=nome_aba_reg, rows="100", cols="15")
                     ws_reg.update([colunas_reg])
                 
-                # 🔥 O PULO DO GATO: Escrevendo os nomes oficiais do Activesoft direto na planilha 🔥
-                ws_reg.update_cell(1, 13, "CURSO_ACTIVESOFT")
-                ws_reg.update_cell(1, 14, "SERIE_ACTIVESOFT")
-                ws_reg.update_cell(1, 15, "TURMA_ACTIVESOFT")
-                ws_reg.update_cell(2, 13, curso)
-                ws_reg.update_cell(2, 14, serie)
-                ws_reg.update_cell(2, 15, turma)
+                # 🔥 O PULO DO GATO 2.0: Escrevendo o DNA tudo de uma vez para não estourar a cota 🔥
+                bloco_dna = [
+                    ["CURSO_ACTIVESOFT", "SERIE_ACTIVESOFT", "TURMA_ACTIVESOFT"],
+                    [curso, serie, turma]
+                ]
+                
+                try:
+                    ws_reg.update(values=bloco_dna, range_name="M1:O2")
+                except:
+                    # Alternativa caso o gspread do servidor seja versão antiga
+                    ws_reg.update("M1:O2", bloco_dna)
 
                 nome_aba_notas = f"Notas_{turma_limpa}"
                 try: planilha.worksheet(nome_aba_notas)
@@ -272,6 +277,10 @@ def construir_banco_de_dados():
                     matriz_base = [["Nº", "Nome da Avaliação"], ["-", "-"], ["-", "-"], ["-", "-"], ["-", "-"]]
                     for _, r_aluno in df_alunos.iterrows(): matriz_base.append([str(r_aluno['Nº'])[:-2] if str(r_aluno['Nº']).endswith(".0") else str(r_aluno['Nº']), str(r_aluno['Nome'])])
                     ws_not.update(matriz_base)
+
+                print(f"    - Abas da turma {turma_limpa} criadas.")
+                # 🫁 Respiro para a API do Google Sheets não bloquear
+                time.sleep(3) 
 
             aba_usuarios.update_cell(prof['linha'], 8, "CONCLUIDO")
             
