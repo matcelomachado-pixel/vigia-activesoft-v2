@@ -98,16 +98,17 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
             pass
     return False
 
-# ================= TRADUTOR =================
+# ================= TRADUTOR (CORRIGIDO PARA ENSINO MÉDIO SEM LETRA) =================
 def traduzir_nome_para_activesoft(nome_sujo):
-    match = re.search(r'(\d)([A-Z])$', nome_sujo.upper())
+    # O [A-Z]? com interrogação significa que a letra é opcional!
+    match = re.search(r'(\d)([A-Z]?)$', nome_sujo.upper().strip())
     if match:
         numero = match.group(1)
         letra = match.group(2)
         if "FUNDAMENTAL" in nome_sujo.upper() or int(numero) > 5:
-            return f"{numero}º ANO {letra}"
+            return f"{numero}º ANO {letra}".strip()
         else:
-            return f"{numero}ª SÉRIE {letra}"
+            return f"{numero}ª SÉRIE {letra}".strip()
     return nome_sujo
 
 # ================= FUNÇÕES DO DIÁRIO =================
@@ -135,7 +136,8 @@ def lancar_ocorrencias(navegador, wait, aula):
         navegador.execute_script("arguments[0].click();", botao_pesquisar)
         time.sleep(5) 
         
-        nome_plan = aula['turma'].upper().strip()
+        # Corrige busca de turma para ocorrências também
+        nome_plan = traduzir_nome_para_activesoft(aula['turma']).upper()
         num_t = "".join([c for c in nome_plan if c.isdigit()])
         letra_t = "A" if nome_plan.endswith("A") else "B" if nome_plan.endswith("B") else ""
 
@@ -982,5 +984,3 @@ def vigiar():
 
 if __name__ == "__main__":
     vigiar()
-
-                                              
