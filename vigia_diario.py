@@ -98,9 +98,8 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
             pass
     return False
 
-# ================= TRADUTOR (CORRIGIDO PARA ENSINO MÉDIO SEM LETRA) =================
+# ================= TRADUTOR =================
 def traduzir_nome_para_activesoft(nome_sujo):
-    # O [A-Z]? com interrogação significa que a letra é opcional!
     match = re.search(r'(\d)([A-Z]?)$', nome_sujo.upper().strip())
     if match:
         numero = match.group(1)
@@ -136,7 +135,6 @@ def lancar_ocorrencias(navegador, wait, aula):
         navegador.execute_script("arguments[0].click();", botao_pesquisar)
         time.sleep(5) 
         
-        # Corrige busca de turma para ocorrências também
         nome_plan = traduzir_nome_para_activesoft(aula['turma']).upper()
         num_t = "".join([c for c in nome_plan if c.isdigit()])
         letra_t = "A" if nome_plan.endswith("A") else "B" if nome_plan.endswith("B") else ""
@@ -174,7 +172,6 @@ def lancar_ocorrencias(navegador, wait, aula):
         navegador.execute_script("arguments[0].click();", botao_proximo)
         time.sleep(3)
 
-        # 🔥 CALENDÁRIO COM ENTER (Ocorrências) 🔥
         try:
             input_data = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@placeholder='DD/MM/AAAA']")))
             input_data.click()
@@ -183,7 +180,7 @@ def lancar_ocorrencias(navegador, wait, aula):
             input_data.send_keys(Keys.BACKSPACE)
             input_data.send_keys(aula['data'])
             time.sleep(0.5)
-            input_data.send_keys(Keys.ENTER)  # Fecha o pop-up
+            input_data.send_keys(Keys.ENTER)  
             time.sleep(0.5)
             input_data.send_keys(Keys.ESCAPE)
         except: pass
@@ -223,8 +220,7 @@ def lancar_ocorrencias(navegador, wait, aula):
         try: navegador.switch_to.default_content()
         except: pass
 
-
-# 🔥 A FUNÇÃO DE FALTAS BLINDADA 🔥
+# 🔥 A FUNÇÃO DE FALTAS COM A CORREÇÃO DE STRINGS 🔥
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": return
     print(f"   [Frequência] Iniciando chamada para {aula['turma']}...")
@@ -242,17 +238,25 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         
         # TRADUTOR ENTRA AQUI PARA LIMPAR O NOME DO SCAN
         nome_turma_bonito = traduzir_nome_para_activesoft(aula['turma'])
-        turma_bruta = nome_turma_bonito.upper()
+        turma_bruta = nome_turma_bonito.upper().replace("º", "°")
         
         curso = "FUNDAMENTAL" if "ANO" in turma_bruta else "MÉDIO"
         
+        # 🔥 A CORREÇÃO DE PRECISÃO ESTÁ AQUI 🔥
         serie_busca = ""
-        for s in ["6", "7", "8", "9"]:
-            if s in turma_bruta: serie_busca = s 
-        for s in ["1", "2", "3"]:
-            if f"{s} SÉRIE" in turma_bruta or f"{s}ª SÉRIE" in turma_bruta: serie_busca = s
+        if curso == "FUNDAMENTAL":
+            match_s = re.search(r'(\d+)°?\s*ANO', turma_bruta)
+            if match_s: serie_busca = f"{match_s.group(1)}° ANO"
+        else:
+            match_s = re.search(r'(\d+)ª?\s*S[EÉ]RIE', turma_bruta)
+            if match_s: serie_busca = f"{match_s.group(1)}ª SÉRIE"
             
-        turma_exata = turma_bruta.replace("º", "°")
+        # Fallback de segurança se falhar
+        if not serie_busca:
+            for s in ["6", "7", "8", "9", "1", "2", "3"]:
+                if s in turma_bruta: serie_busca = s
+                
+        turma_exata = turma_bruta
         
         print("   [Frequência] 📍 Preenchendo as caixas de seleção...")
         
@@ -325,7 +329,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         preencher_select_blindado(3, turma_exata)  
         preencher_select_blindado(5, etapa_atual)
         
-        # 🔥 CALENDÁRIO BLINDADO (Injeta e fecha o popup) 🔥
         try:
             inps_data = navegador.find_elements(By.XPATH, "//input[contains(@class, 'Datepicker') or contains(@class, 'DatePicker') or @placeholder='DD/MM/AAAA']")
             if inps_data:
@@ -342,7 +345,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         except Exception as e: 
             raise Exception(f"Erro ao preencher a data: {e}")
 
-        # 🔥 CONSULTAR COM AVISO DE ERRO FATAL 🔥
         try:
             botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
             navegador.execute_script("arguments[0].click();", botao_consultar)
@@ -372,7 +374,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             
             if opcoes: navegador.execute_script("arguments[0].click();", opcoes[-1])
 
-        # 🔥 PRESENÇA COM AVISO DE ERRO FATAL 🔥
         try:
             botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
             clicar_opcao_tabela(botao_selecione, "Presente")
@@ -397,7 +398,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 except Exception as erro_falta: 
                     print(f"        ⚠️ Não achou o aluno {num} na tabela.")
         
-        # 🔥 SALVAR COM AVISO DE ERRO FATAL 🔥
         try:
             botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_salvar)
