@@ -25,6 +25,7 @@ SPREADSHEET_ID = '17XZfEUKiiryGJgj_nXdQ7gXzdByEwsZ7ecax44ZeJmc'
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 # ================= MAPA CLÁSSICO RESTAURADO =================
+# Ele serve APENAS para achar a turma na TELA INICIAL (Dashboard)
 MAPA_TURMAS = {
     "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD",
     "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD", "8B": "EFII-8B-FD",
@@ -52,10 +53,8 @@ def avisar_telegram(chat_id, mensagem):
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": mensagem, "parse_mode": "HTML"}
-    try: 
-        requests.post(url, json=payload, timeout=10)
-    except: 
-        pass
+    try: requests.post(url, json=payload, timeout=10)
+    except: pass
 
 def mandar_print_telegram(chat_id, caminho_imagem, legenda=""):
     token = os.environ.get("TELEGRAM_TOKEN")
@@ -65,8 +64,7 @@ def mandar_print_telegram(chat_id, caminho_imagem, legenda=""):
     try:
         with open(caminho_imagem, 'rb') as f:
             requests.post(url, data={"chat_id": chat_id, "caption": legenda}, files={"photo": f}, timeout=15)
-    except: 
-        pass
+    except: pass
 
 def conectar_sheets():
     creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", SCOPE) 
@@ -81,8 +79,7 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
         time.sleep(0.5)
         navegador.execute_script("arguments[0].click();", btn)
         return True
-    except:
-        pass
+    except: pass
         
     frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
     for f in frames:
@@ -94,21 +91,8 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
             time.sleep(0.5)
             navegador.execute_script("arguments[0].click();", btn)
             return True
-        except:
-            pass
+        except: pass
     return False
-
-# ================= TRADUTOR =================
-def traduzir_nome_para_activesoft(nome_sujo):
-    match = re.search(r'(\d)([A-Z]?)$', nome_sujo.upper().strip())
-    if match:
-        numero = match.group(1)
-        letra = match.group(2)
-        if "FUNDAMENTAL" in nome_sujo.upper() or int(numero) > 5:
-            return f"{numero}º ANO {letra}".strip()
-        else:
-            return f"{numero}ª SÉRIE {letra}".strip()
-    return nome_sujo
 
 # ================= FUNÇÕES DO DIÁRIO =================
 def lancar_ocorrencias(navegador, wait, aula):
@@ -135,9 +119,10 @@ def lancar_ocorrencias(navegador, wait, aula):
         navegador.execute_script("arguments[0].click();", botao_pesquisar)
         time.sleep(5) 
         
-        nome_plan = traduzir_nome_para_activesoft(aula['turma']).upper()
-        num_t = "".join([c for c in nome_plan if c.isdigit()])
-        letra_t = "A" if nome_plan.endswith("A") else "B" if nome_plan.endswith("B") else ""
+        # Pega a Turma Oficial do DNA
+        turma_exata = aula['turma_ativa'].upper()
+        num_t = "".join([c for c in aula['turma'] if c.isdigit()])
+        letra_t = aula['turma'][-1] if aula['turma'][-1].isalpha() else ""
 
         for num in numeros_alvo:
             try:
@@ -220,11 +205,18 @@ def lancar_ocorrencias(navegador, wait, aula):
         try: navegador.switch_to.default_content()
         except: pass
 
-
-# 🔥 A FUNÇÃO DE FALTAS BLINDADA COM RESPIRO DE SERVIDOR 🔥
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": return
-    print(f"   [Frequência] Iniciando chamada para {aula['turma']}...")
+    
+    # 🔥 A MÁGICA ACONTECE AQUI: Pegando o DNA exato sem usar regex! 🔥
+    curso = aula['curso_ativo']
+    serie_busca = aula['serie_ativo']
+    turma_exata = aula['turma_ativa']
+    
+    if not curso or not serie_busca or not turma_exata:
+        raise Exception("O DNA do Activesoft (Curso/Série/Turma) não foi encontrado na aba da planilha.")
+    
+    print(f"   [Frequência] Iniciando chamada para {turma_exata}...")
     try:
         try: navegador.switch_to.default_content()
         except: pass
@@ -236,25 +228,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         except:
             navegador.get("https://siga02.activesoft.com.br/diarios/frequencia_em_lote/")
         time.sleep(5)
-        
-        nome_turma_bonito = traduzir_nome_para_activesoft(aula['turma'])
-        turma_bruta = nome_turma_bonito.upper().replace("º", "°")
-        
-        curso = "FUNDAMENTAL" if "ANO" in turma_bruta else "MÉDIO"
-        
-        serie_busca = ""
-        if curso == "FUNDAMENTAL":
-            match_s = re.search(r'(\d+)°?\s*ANO', turma_bruta)
-            if match_s: serie_busca = f"{match_s.group(1)}° ANO"
-        else:
-            match_s = re.search(r'(\d+)ª?\s*S[EÉ]RIE', turma_bruta)
-            if match_s: serie_busca = f"{match_s.group(1)}ª SÉRIE"
-            
-        if not serie_busca:
-            for s in ["6", "7", "8", "9", "1", "2", "3"]:
-                if s in turma_bruta: serie_busca = s
-                
-        turma_exata = turma_bruta
         
         print("   [Frequência] 📍 Preenchendo as caixas de seleção...")
         
@@ -293,10 +266,8 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                             try:
                                 navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
                                 time.sleep(0.5)
-                                try:
-                                    op.click()
-                                except:
-                                    webdriver.ActionChains(navegador).move_to_element(op).click().perform()
+                                try: op.click()
+                                except: webdriver.ActionChains(navegador).move_to_element(op).click().perform()
                                 clicou = True
                                 break
                             except: pass
@@ -322,31 +293,15 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
                 
-                time.sleep(1)
-                
-                # 🔥 O PLANO B: SE A TURMA FALHAR, FORÇA A PRIMEIRA DA LISTA 🔥
-                if idx == 3:
-                    try:
-                        container = inp.find_element(By.XPATH, "../../..")
-                        if "Selecione" in container.text:
-                            print("   [Frequência] ⚠️ Texto não casou. Forçando a primeira Turma disponível...")
-                            inp.send_keys(Keys.CONTROL + "a")
-                            inp.send_keys(Keys.BACKSPACE)
-                            time.sleep(1)
-                            inp.send_keys(Keys.ARROW_DOWN)
-                            time.sleep(0.5)
-                            inp.send_keys(Keys.ENTER)
-                    except: pass
-                    
                 time.sleep(2)
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
 
-        # Execução das caixas com "Respiro" pro servidor Activesoft
+        # Execução Direta: Lê o DNA do Activesoft e injeta no Activesoft
         preencher_select_blindado(1, curso)
         time.sleep(2)
         preencher_select_blindado(2, serie_busca)
-        time.sleep(4) # Espera a engrenagem do Activesoft carregar as turmas
+        time.sleep(4) 
         preencher_select_blindado(3, turma_exata)  
         time.sleep(2)
         preencher_select_blindado(5, etapa_atual)
@@ -489,10 +444,8 @@ def lancar_notas(navegador, wait, nota_info):
                     try:
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
                         time.sleep(0.5)
-                        try:
-                            op.click()
-                        except:
-                            webdriver.ActionChains(navegador).move_to_element(op).click().perform()
+                        try: op.click()
+                        except: webdriver.ActionChains(navegador).move_to_element(op).click().perform()
                         clicou = True
                         break
                     except: pass
@@ -589,7 +542,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V37 (ARQUITETURA MULTI-USUÁRIO CÂMERA)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V38 (ARQUITETURA DNA ACTIVESOFT)")
     print("="*60)
     
     try:
@@ -614,12 +567,26 @@ def vigiar():
         aulas_por_prof = {}
         notas_por_prof = {}
         
-        abas_registos = [aba for aba in planilha.worksheets() if aba.title.startswith("registos_")]
-        for aba in abas_registos:
-            turma_nome = aba.title.replace("registos_", "")
+        # 🔥 PROCURA PELAS ABAS "registros_" (COM R) 🔥
+        abas_registros = [aba for aba in planilha.worksheets() if aba.title.startswith("registros_")]
+        for aba in abas_registros:
+            turma_nome = aba.title.replace("registros_", "")
             dados_brutos = aba.get_all_values()
             if len(dados_brutos) < 2: 
                 continue
+            
+            # 🔥 EXTRAI O DNA DO ACTIVESOFT SALVO NA PLANILHA (Linha 2, Colunas M, N, O) 🔥
+            try:
+                cabecalhos_reg = [str(c).strip().upper() for c in dados_brutos[0]]
+                idx_curso = cabecalhos_reg.index("CURSO_ACTIVESOFT")
+                idx_serie = cabecalhos_reg.index("SERIE_ACTIVESOFT")
+                idx_turma = cabecalhos_reg.index("TURMA_ACTIVESOFT")
+                
+                curso_ativo = str(dados_brutos[1][idx_curso]).strip()
+                serie_ativo = str(dados_brutos[1][idx_serie]).strip()
+                turma_ativa = str(dados_brutos[1][idx_turma]).strip()
+            except:
+                curso_ativo, serie_ativo, turma_ativa = "", "", ""
             
             cabecalhos = [str(c).strip().upper() for c in dados_brutos[0]]
             col_diario = -1
@@ -669,7 +636,10 @@ def vigiar():
                         "nao_fez": str(linha_dict.get("NAO_FEZ", "")).strip(), 
                         "tarefa_nao_feita": str(linha_dict.get("TAREFA_NAO_FEITA", "")).strip(),
                         "faltas": str(linha_dict.get("FALTAS", "")).strip(), 
-                        "tipo_lancamento": st_falta 
+                        "tipo_lancamento": st_falta,
+                        "curso_ativo": curso_ativo,   # <--- Injetando DNA
+                        "serie_ativo": serie_ativo,   # <--- Injetando DNA
+                        "turma_ativa": turma_ativa    # <--- Injetando DNA
                     })
 
         abas_notas = [aba for aba in planilha.worksheets() if aba.title.startswith("Notas_")]
@@ -772,13 +742,12 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        nome_traduzido = traduzir_nome_para_activesoft(aula['turma'])
-                        turma_site = MAPA_TURMAS.get(nome_traduzido.upper().strip(), nome_traduzido)
+                        turma_site = MAPA_TURMAS.get(aula['turma'], aula['turma'])
                         
                         xpath_diario = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"
                         
                         if not achar_e_clicar(navegador, xpath_diario, tempo_espera=5):
-                            raise Exception(f"Turma '{turma_site}' não foi achada na tela.")
+                            raise Exception(f"Turma '{turma_site}' não foi achada na tela inicial.")
                         time.sleep(5) 
                         
                         if aula['status_diario'] in ["Pendente", "Pendente_Nova"]:
@@ -893,13 +862,13 @@ def vigiar():
                                     if erro_swal and erro_swal[0].is_displayed():
                                         titulo_erro = navegador.find_element(By.ID, "swal2-title").text
                                         navegador.execute_script("arguments[0].click();", navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]"))
-                                        raise Exception(f"Activesoft recusou: {titulo_erro}")
+                                        raise Exception(f"Aviso na tela: {titulo_erro}")
                                         
                                     btn_sim = navegador.find_elements(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
                                     if btn_sim and btn_sim[0].is_displayed(): 
                                         navegador.execute_script("arguments[0].click();", btn_sim[0])
                                 except Exception as c_e:
-                                    if "Activesoft recusou" in str(c_e): raise c_e
+                                    if "Aviso na tela" in str(c_e): raise c_e
                                     
                                 for err in navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]"):
                                     if err.is_displayed():
@@ -939,7 +908,7 @@ def vigiar():
                                 relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:80]}\n"
                                 try:
                                     navegador.save_screenshot("erro_falta.png")
-                                    mandar_print_telegram(id_prof, "erro_falta.png", f"🚨 *Erro nas Faltas: {aula['turma']}*\nO robô não achou o nome dessa turma no menu. Veja a foto:")
+                                    mandar_print_telegram(id_prof, "erro_falta.png", f"🚨 *Erro nas Faltas: {aula['turma']}*\nO robô não achou a turma. Veja a foto:")
                                 except: 
                                     pass
 
@@ -975,8 +944,7 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        nome_traduzido = traduzir_nome_para_activesoft(nota['turma'])
-                        turma_site = MAPA_TURMAS.get(nome_traduzido.upper().strip(), nome_traduzido)
+                        turma_site = MAPA_TURMAS.get(nota['turma'], nota['turma'])
                         
                         xpath_notas = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
                         
