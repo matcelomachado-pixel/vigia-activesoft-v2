@@ -119,7 +119,6 @@ def lancar_ocorrencias(navegador, wait, aula):
         navegador.execute_script("arguments[0].click();", botao_pesquisar)
         time.sleep(5) 
         
-        # Pega a Turma Oficial do DNA
         turma_exata = aula['turma_ativa'].upper()
         num_t = "".join([c for c in aula['turma'] if c.isdigit()])
         letra_t = aula['turma'][-1] if aula['turma'][-1].isalpha() else ""
@@ -205,17 +204,18 @@ def lancar_ocorrencias(navegador, wait, aula):
         try: navegador.switch_to.default_content()
         except: pass
 
+# 🔥 A SUA FUNÇÃO EXATA, COM A NOSSA INJEÇÃO DE DNA 🔥
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": return
     
-    # 🔥 A MÁGICA ACONTECE AQUI: Pegando o DNA exato sem usar regex! 🔥
+    # Pegando as informações oficiais do banco de dados (DNA)
     curso = aula['curso_ativo']
     serie_busca = aula['serie_ativo']
     turma_exata = aula['turma_ativa']
     
     if not curso or not serie_busca or not turma_exata:
         raise Exception("O DNA do Activesoft (Curso/Série/Turma) não foi encontrado na aba da planilha.")
-    
+        
     print(f"   [Frequência] Iniciando chamada para {turma_exata}...")
     try:
         try: navegador.switch_to.default_content()
@@ -253,59 +253,34 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
                 time.sleep(1)
                 
-                # 🔥 REGRA DE EXCEÇÃO: A FASE (ETAPA) SÓ ACEITA CLIQUE FÍSICO! 🔥
-                if idx == 5:
-                    try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
-                    except: pass
-                    time.sleep(1.5)
-                    
-                    opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')] | //span[contains(text(), '{texto}')]")
-                    if opcoes:
-                        for op in reversed(opcoes):
-                            if op.is_displayed():
-                                try:
-                                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
-                                    time.sleep(0.5)
-                                    try: op.click()
-                                    except: webdriver.ActionChains(navegador).move_to_element(op).click().perform()
-                                    print(f"   [Frequência] ✔️ Fase '{texto}' cravada via clique físico!")
-                                    break
-                                except: pass
-                    time.sleep(2)
-                    return # ABORTA A FUNÇÃO AQUI: IMPEDE O ROBÔ DE DIGITAR NESTE CAMPO!
-                
-                # --- LÓGICA ORIGINAL PARA CURSO, SÉRIE E TURMA (Intacta) ---
                 try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
                 except: pass
-                time.sleep(1.5)
+                time.sleep(1)
                 
-                clicou = False
+                navegador.execute_script("arguments[0].focus();", inp)
                 
-                opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')] | //span[contains(text(), '{texto}')]")
-                if opcoes:
-                    for op in reversed(opcoes):
-                        if op.is_displayed():
-                            try:
-                                navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
-                                time.sleep(0.5)
-                                try: op.click()
-                                except: webdriver.ActionChains(navegador).move_to_element(op).click().perform()
-                                clicou = True
-                                break
-                            except: pass
-                
-                if not clicou:
-                    navegador.execute_script("arguments[0].focus();", inp)
-                    try:
-                        inp.send_keys(Keys.CONTROL + "a")
-                        inp.send_keys(Keys.BACKSPACE)
-                    except: pass
-                    time.sleep(0.5)
-                    
-                    try: inp.send_keys(texto)
-                    except: navegador.execute_script(JS_REACT_SETTER, inp, texto)
+                try:
+                    inp.send_keys(Keys.CONTROL + "a")
+                    inp.send_keys(Keys.BACKSPACE)
+                    inp.send_keys(texto)
+                    time.sleep(1.5)
+                except:
+                    navegador.execute_script(JS_REACT_SETTER, inp, texto)
                     time.sleep(2)
+                
+                opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')]")
+                
+                if opcoes:
+                    clicou_exato = False
+                    for opcao in opcoes:
+                        if texto.upper() == opcao.text.strip().upper():
+                            navegador.execute_script("arguments[0].click();", opcao)
+                            clicou_exato = True
+                            break
                     
+                    if not clicou_exato:
+                        navegador.execute_script("arguments[0].click();", opcoes[-1])
+                else:
                     try:
                         inp.send_keys(Keys.ARROW_DOWN)
                         time.sleep(0.5)
@@ -315,17 +290,14 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
                 
-                time.sleep(2)
+                time.sleep(2.5) 
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
 
-        # Execução Direta: Lê o DNA do Activesoft e injeta no Activesoft
-        preencher_select_blindado(1, curso)
-        time.sleep(2)
-        preencher_select_blindado(2, serie_busca)
-        time.sleep(4) 
+        # Injetando as variáveis do DNA
+        preencher_select_blindado(1, curso)        
+        preencher_select_blindado(2, serie_busca)       
         preencher_select_blindado(3, turma_exata)  
-        time.sleep(2)
         preencher_select_blindado(5, etapa_atual)
         
         try:
@@ -355,17 +327,17 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
             time.sleep(0.5)
-            try: botao_alvo.click()
-            except: navegador.execute_script("arguments[0].click();", botao_alvo)
-            time.sleep(1)
+            try: botao_alvo.click() # Clique nativo
+            except: navegador.execute_script("arguments[0].click();", botao_alvo) # Falhou? Vai no JS.
+            time.sleep(1) 
             
             xpath = f"//*[normalize-space(text())='{texto_opcao}']"
             opcoes = navegador.find_elements(By.XPATH, xpath)
             
             for op in opcoes:
-                if op.is_displayed():
+                if op.is_displayed(): 
                     try:
-                        op.click()
+                        op.click() 
                         return
                     except:
                         webdriver.ActionChains(navegador).move_to_element(op).click().perform()
@@ -386,7 +358,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             numeros_falta = [n.strip() for n in faltas_str.split(',')]
             for num in numeros_falta:
                 try:
-                    indice_linha = int(num) + 1
+                    indice_linha = int(num) + 1 # Pula o cabeçalho
                     xpath_linha = f"(//tbody/tr)[{indice_linha}]"
                     linha = navegador.find_element(By.XPATH, xpath_linha)
                     
@@ -564,7 +536,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V39 (EXCEÇÃO DE CLIQUE FASE APLICADA)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V41 (ARQUITETURA DNA + LÓGICA MARCELO)")
     print("="*60)
     
     try:
@@ -719,9 +691,9 @@ def vigiar():
             etapa_atual = "2ª Etapa"
             try:
                 valor_cru = str(planilha.worksheet(dados_prof['aba_config']).acell("B1").value).strip().lower()
-                if "rec" in valor_cru and "1" in valor_cru: etapa_atual = "Rec. 1ª Etapa"
-                elif "rec" in valor_cru and "2" in valor_cru: etapa_atual = "Rec. 2ª Etapa"
-                elif "rec" in valor_cru and "3" in valor_cru: etapa_atual = "Rec. 3ª Etapa"
+                if "rec" in valor_cru and "1" in valor_cru: etapa_atual = "Recup. 1ª Etapa"
+                elif "rec" in valor_cru and "2" in valor_cru: etapa_atual = "Recup. 2ª Etapa"
+                elif "rec" in valor_cru and "3" in valor_cru: etapa_atual = "Recup. 3ª Etapa"
                 elif "1" in valor_cru: etapa_atual = "1ª Etapa"
                 elif "2" in valor_cru: etapa_atual = "2ª Etapa"
                 elif "3" in valor_cru: etapa_atual = "3ª Etapa"
