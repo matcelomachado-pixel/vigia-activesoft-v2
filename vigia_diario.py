@@ -31,11 +31,14 @@ MAPA_TURMAS = {
     "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD", "8B": "EFII-8B-FD",
     "9º ANO A": "EFII-9A-FD", "9º A": "EFII-9A-FD", "9 ANO A": "EFII-9A-FD", "9A": "EFII-9A-FD",
     "9º ANO B": "EFII-9B-FD", "9º B": "EFII-9B-FD", "9 ANO B": "EFII-9B-FD", "9B": "EFII-9B-FD",
-    "2ª SÉRIE": "EM-2SEM-FD", "2ª SÉRIE EM": "EM-2SEM-FD", "2 SÉRIE": "EM-2SEM-FD", "2EM": "EM-2SEM-FD",
-    "3ª SÉRIE": "EM-3SEM-FD", "3ª SÉRIE EM": "EM-3SEM-FD", "3 SÉRIE": "EM-3SEM-FD", "3EM": "EM-3SEM-FD",
-    "6º ANO A": "6° ANO A", "6º ANO B": "6º ANO B", "6º A": "6° ANO A", "6º B": "6º ANO B", "6A": "6° ANO A", "6B": "6º ANO B",
-    "7º ANO A": "7° ANO A", "7º ANO B": "7º ANO B", "7º A": "7° ANO A", "7º B": "7º ANO B", "7A": "7° ANO A", "7B": "7º ANO B",
-    "1ª SÉRIE": "1ª SÉRIE", "1ª SÉRIE EM": "1ª SÉRIE", "1EM": "1ª SÉRIE"
+    
+    # Adicionando os números limpos do Ensino Médio!
+    "1ª SÉRIE": "1ª SÉRIE", "1ª SÉRIE EM": "1ª SÉRIE", "1EM": "1ª SÉRIE", "1": "1ª SÉRIE",
+    "2ª SÉRIE": "EM-2SEM-FD", "2ª SÉRIE EM": "EM-2SEM-FD", "2 SÉRIE": "EM-2SEM-FD", "2EM": "EM-2SEM-FD", "2": "EM-2SEM-FD",
+    "3ª SÉRIE": "EM-3SEM-FD", "3ª SÉRIE EM": "EM-3SEM-FD", "3 SÉRIE": "EM-3SEM-FD", "3EM": "EM-3SEM-FD", "3": "EM-3SEM-FD",
+    
+    "6º ANO A": "6° ANO A", "6º ANO B": "6º ANO B", "6º A": "6° ANO A", "6º B": "6º ANO B", "6A": "6° ANO A", "6B": "6º ANO B", "6": "6° ANO A",
+    "7º ANO A": "7° ANO A", "7º ANO B": "7º ANO B", "7º A": "7° ANO A", "7º B": "7º ANO B", "7A": "7° ANO A", "7B": "7º ANO B", "7": "7° ANO A"
 }
 
 JS_REACT_SETTER = """
@@ -208,7 +211,6 @@ def lancar_ocorrencias(navegador, wait, aula):
 def lancar_faltas(navegador, wait, aula, etapa_atual):
     if aula['tipo_lancamento'] != "Pendente_Nova": return
     
-    # Pegando as informações oficiais do banco de dados (DNA)
     curso = aula['curso_ativo']
     serie_busca = aula['serie_ativo']
     turma_exata = aula['turma_ativa']
@@ -294,7 +296,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
 
-        # Injetando as variáveis do DNA
         preencher_select_blindado(1, curso)        
         preencher_select_blindado(2, serie_busca)       
         preencher_select_blindado(3, turma_exata)  
@@ -327,8 +328,8 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
             time.sleep(0.5)
-            try: botao_alvo.click() # Clique nativo
-            except: navegador.execute_script("arguments[0].click();", botao_alvo) # Falhou? Vai no JS.
+            try: botao_alvo.click() 
+            except: navegador.execute_script("arguments[0].click();", botao_alvo) 
             time.sleep(1) 
             
             xpath = f"//*[normalize-space(text())='{texto_opcao}']"
@@ -358,7 +359,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             numeros_falta = [n.strip() for n in faltas_str.split(',')]
             for num in numeros_falta:
                 try:
-                    indice_linha = int(num) + 1 # Pula o cabeçalho
+                    indice_linha = int(num) + 1 
                     xpath_linha = f"(//tbody/tr)[{indice_linha}]"
                     linha = navegador.find_element(By.XPATH, xpath_linha)
                     
@@ -536,7 +537,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V41 (ARQUITETURA DNA + LÓGICA MARCELO)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V42 (MAPA CORRIGIDO E DNA INJETADO)")
     print("="*60)
     
     try:
@@ -734,7 +735,11 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        turma_site = MAPA_TURMAS.get(aula['turma'], aula['turma'])
+                        # 🔥 A MÁGICA FINAL: Procura pela aba e pelo DNA para não falhar nunca mais! 🔥
+                        turma_busca = MAPA_TURMAS.get(aula['turma'].upper().strip())
+                        if not turma_busca:
+                            turma_busca = MAPA_TURMAS.get(aula['turma_ativa'].upper().strip(), aula['turma_ativa'].upper().strip())
+                        turma_site = turma_busca
                         
                         xpath_diario = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"
                         
@@ -936,7 +941,10 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        turma_site = MAPA_TURMAS.get(nota['turma'], nota['turma'])
+                        turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip())
+                        if not turma_busca:
+                            turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'].upper().strip())
+                        turma_site = turma_busca
                         
                         xpath_notas = f"//*[contains(text(), '{turma_site}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_site}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
                         
