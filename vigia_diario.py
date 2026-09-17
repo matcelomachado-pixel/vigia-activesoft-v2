@@ -253,6 +253,28 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", inp)
                 time.sleep(1)
                 
+                # 🔥 REGRA DE EXCEÇÃO: A FASE (ETAPA) SÓ ACEITA CLIQUE FÍSICO! 🔥
+                if idx == 5:
+                    try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
+                    except: pass
+                    time.sleep(1.5)
+                    
+                    opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{texto}')] | //li[contains(text(), '{texto}')] | //span[contains(text(), '{texto}')]")
+                    if opcoes:
+                        for op in reversed(opcoes):
+                            if op.is_displayed():
+                                try:
+                                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
+                                    time.sleep(0.5)
+                                    try: op.click()
+                                    except: webdriver.ActionChains(navegador).move_to_element(op).click().perform()
+                                    print(f"   [Frequência] ✔️ Fase '{texto}' cravada via clique físico!")
+                                    break
+                                except: pass
+                    time.sleep(2)
+                    return # ABORTA A FUNÇÃO AQUI: IMPEDE O ROBÔ DE DIGITAR NESTE CAMPO!
+                
+                # --- LÓGICA ORIGINAL PARA CURSO, SÉRIE E TURMA (Intacta) ---
                 try: navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
                 except: pass
                 time.sleep(1.5)
@@ -542,7 +564,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V38 (ARQUITETURA DNA ACTIVESOFT)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V39 (EXCEÇÃO DE CLIQUE FASE APLICADA)")
     print("="*60)
     
     try:
@@ -567,7 +589,6 @@ def vigiar():
         aulas_por_prof = {}
         notas_por_prof = {}
         
-        # 🔥 PROCURA PELAS ABAS "registros_" (COM R) 🔥
         abas_registros = [aba for aba in planilha.worksheets() if aba.title.startswith("registros_")]
         for aba in abas_registros:
             turma_nome = aba.title.replace("registros_", "")
@@ -575,7 +596,6 @@ def vigiar():
             if len(dados_brutos) < 2: 
                 continue
             
-            # 🔥 EXTRAI O DNA DO ACTIVESOFT SALVO NA PLANILHA (Linha 2, Colunas M, N, O) 🔥
             try:
                 cabecalhos_reg = [str(c).strip().upper() for c in dados_brutos[0]]
                 idx_curso = cabecalhos_reg.index("CURSO_ACTIVESOFT")
@@ -637,9 +657,9 @@ def vigiar():
                         "tarefa_nao_feita": str(linha_dict.get("TAREFA_NAO_FEITA", "")).strip(),
                         "faltas": str(linha_dict.get("FALTAS", "")).strip(), 
                         "tipo_lancamento": st_falta,
-                        "curso_ativo": curso_ativo,   # <--- Injetando DNA
-                        "serie_ativo": serie_ativo,   # <--- Injetando DNA
-                        "turma_ativa": turma_ativa    # <--- Injetando DNA
+                        "curso_ativo": curso_ativo,   
+                        "serie_ativo": serie_ativo,   
+                        "turma_ativa": turma_ativa    
                     })
 
         abas_notas = [aba for aba in planilha.worksheets() if aba.title.startswith("Notas_")]
