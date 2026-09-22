@@ -2,19 +2,17 @@ name: Vigia Assessor.IA Multi-Workers
 
 on:
   schedule:
-    # Exemplo: Roda de hora em hora. Mantenha o horário que você já usava!
+    # Ajuste para o horário que você já usa (ex: a cada hora)
     - cron: '0/15 * * * *' 
-  workflow_dispatch: # Permite que você aperte o botão "Run workflow" manualmente
+  workflow_dispatch:
 
 jobs:
   vigiar_tarefas:
     runs-on: ubuntu-latest
     
-    # 🔥 A MÁGICA DOS MULTI-WORKERS COMEÇA AQUI 🔥
+    # LIGANDO OS 3 ROBÔS
     strategy:
       matrix:
-        # O GitHub vai criar 3 máquinas virtuais simultâneas!
-        # Se um dia quiser 5 robôs, é só mudar para: [1, 2, 3, 4, 5]
         robo_id: [1, 2, 3] 
 
     steps:
@@ -24,17 +22,23 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10' # Ou a versão que você já estava usando
+          python-version: '3.10'
 
       - name: Instalar dependências
         run: |
-          pip install gspread oauth2client selenium requests urllib3
+          pip install gspread oauth2client selenium requests urllib3 pandas
 
-      # Gera o arquivo de credenciais do Google a partir do Secret do GitHub
       - name: Criar credenciais.json
         run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credenciais.json
 
-      # Roda o arquivo Python. Cada um dos 3 robôs vai executar isso ao mesmo tempo!
+      # 🔥 RODA O SCAN APENAS NA MÁQUINA 1 (Para não dar conflito)
+      - name: Executar o Vigia Scan
+        if: matrix.robo_id == 1
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: python vigia_scan.py
+
+      # 🔥 RODA O DIÁRIO NAS 3 MÁQUINAS AO MESMO TEMPO
       - name: Executar o Vigia Diário
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
