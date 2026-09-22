@@ -12,6 +12,7 @@ import urllib3
 import ssl
 import requests
 import pandas as pd
+from cryptography.fernet import Fernet
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 try: 
@@ -33,7 +34,7 @@ def avisar_telegram(chat_id, mensagem):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try: 
         requests.post(url, json={"chat_id": chat_id, "text": mensagem, "parse_mode": "HTML"}, timeout=10)
-    except: 
+    except Exception: 
         pass
 
 def mandar_print_telegram(chat_id, caminho_imagem, legenda=""):
@@ -44,23 +45,23 @@ def mandar_print_telegram(chat_id, caminho_imagem, legenda=""):
     try:
         with open(caminho_imagem, 'rb') as f:
             requests.post(url, data={"chat_id": chat_id, "caption": legenda}, files={"photo": f}, timeout=15)
-    except: 
+    except Exception: 
         pass
 
-def conectar_sheets(tentativas=5):
-    for i in range(tentativas):
+def conectar_sheets():
+    for tentativa in range(6):
         try:
             creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", SCOPE) 
             client = gspread.authorize(creds)
             return client.open_by_key(SPREADSHEET_ID)
         except Exception as e:
             if '429' in str(e) or 'Quota' in str(e):
-                espera = 15 * (i + 1)
-                print(f"⏳ O Google pediu calma (Limite 429). O Robô vai tomar um café de {espera}s e tentar de novo...")
+                espera = 10 * (tentativa + 1)
+                print(f"⏳ Limite do Google (429). Aguardando {espera}s...")
                 time.sleep(espera)
             else:
                 raise e
-    raise Exception("Falha ao conectar no Google Sheets após várias tentativas.")
+    raise Exception("Falha de conexão com o Google Sheets.")
 
 def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
     navegador.switch_to.default_content()
@@ -70,7 +71,7 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
         time.sleep(0.5)
         navegador.execute_script("arguments[0].click();", btn)
         return True
-    except: 
+    except Exception: 
         pass
         
     for f in navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame"):
@@ -82,7 +83,7 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
             time.sleep(0.5)
             navegador.execute_script("arguments[0].click();", btn)
             return True
-        except: 
+        except Exception: 
             pass
     return False
 
@@ -99,13 +100,13 @@ def buscar_linhas_tabela(navegador):
             linhas = navegador.find_elements(By.XPATH, "//tbody/tr")
             if len(linhas) > 1: 
                 return linhas
-        except: 
+        except Exception: 
             pass
     return []
 
 def construir_banco_de_dados():
     print("="*60)
-    print(" 🛠️ VIGIA SCAN: CONSTRUTOR DE BANCO DE DADOS V45")
+    print(" 🛠️ VIGIA SCAN: V48 (CRIPTOGRAFIA AES ATIVADA)")
     print("="*60)
     
     planilha = conectar_sheets()
@@ -116,14 +117,25 @@ def construir_banco_de_dados():
     for i, row in enumerate(dados_usuarios[1:]):
         linha_sheets = i + 2
         if len(row) >= 8 and str(row[7]).strip() == "PENDENTE":
+            senha_banco = str(row[5]).strip()
+            
+            # 🔥 DESEMBARALHADOR DA SENHA 🔥
+            try:
+                vigia_key = os.environ.get("VIGIA_KEY")
+                if vigia_key:
+                    fernet = Fernet(vigia_key.encode('utf-8'))
+                    senha_banco = fernet.decrypt(senha_banco.encode('utf-8')).decode('utf-8')
+            except Exception:
+                pass # Se der erro, assume que a senha ainda não estava criptografada na planilha
+
             professores_pendentes.append({
                 "linha": linha_sheets, 
                 "chat_id": str(row[0]).strip(),
                 "nome": str(row[1]).strip(), 
-                "unidade": str(row[2]).strip(), # 🔥 UNIDADE CAPTURADA
+                "unidade": str(row[2]).strip(),
                 "codigo": str(row[3]).strip(),
                 "login": str(row[4]).strip(), 
-                "senha": str(row[5]).strip()
+                "senha": senha_banco
             })
 
     if not professores_pendentes:
@@ -152,7 +164,7 @@ def construir_banco_de_dados():
             try: 
                 WebDriverWait(navegador, 3).until(EC.element_to_be_clickable((By.XPATH, "//img[@alt='Activesoft Logo']"))).click()
                 time.sleep(2)
-            except: 
+            except Exception: 
                 pass 
             
             print(" -> Acessando tela de Ocorrências...")
@@ -200,7 +212,6 @@ def construir_banco_de_dados():
                                 continue
                             txt_upper = txt.upper()
                             
-                            # 1. É a TURMA? (Tem barra '/' separando as infos)
                             if "/" in txt_upper and ("ANO" in txt_upper or "SÉRIE" in txt_upper or "SERIE" in txt_upper or "EM" in txt_upper):
                                 partes = [p.strip() for p in txt_upper.split("/")]
                                 if len(partes) >= 3:
@@ -209,18 +220,15 @@ def construir_banco_de_dados():
                                     turma_ativa = partes[-1] 
                                     texto_turma = turma_ativa
                             
-                            # Fallback de segurança se não houver barras na escola
                             elif ("ANO" in txt_upper or "SÉRIE" in txt_upper or "SERIE" in txt_upper) and any(c.isdigit() for c in txt_upper) and not texto_turma:
                                 texto_turma = txt_upper
                                 curso_ativo = "MÉDIO" if "SÉRIE" in txt_upper else "FUNDAMENTAL"
                                 serie_ativo = txt_upper
                                 turma_ativa = txt_upper
                                 
-                            # 2. É o NÚMERO de chamada?
                             elif txt.isdigit() and not numero:
                                 numero = txt
                                 
-                            # 3. É o NOME do aluno?
                             elif len(txt) > 5 and not any(c.isdigit() for c in txt_upper) and " " in txt_upper and not nome_aluno:
                                 nome_aluno = txt.title()
                                 
@@ -235,7 +243,7 @@ def construir_banco_de_dados():
                             
                             if not any(a['nome'] == nome_aluno for a in turmas_coletadas[texto_turma]["alunos"]):
                                 turmas_coletadas[texto_turma]["alunos"].append({"n": numero, "nome": nome_aluno})
-                    except: 
+                    except Exception: 
                         pass
                 
                 total_atual = sum(len(dados["alunos"]) for dados in turmas_coletadas.values())
@@ -254,7 +262,7 @@ def construir_banco_de_dados():
                         print(f" -> Rolando a página para baixo... (Lidos até agora: {total_atual})")
                         navegador.execute_script("arguments[0].scrollIntoView({block: 'end'});", linhas[-1])
                         time.sleep(4) 
-                except: 
+                except Exception: 
                     time.sleep(3)
 
             total_turmas = len(turmas_coletadas)
@@ -265,7 +273,6 @@ def construir_banco_de_dados():
 
             print(" -> Criando Banco de Dados no Google Sheets (Com Isolamento por Escolas)...")
             
-            # 🔥 CRIA O NOME LIMPO DA UNIDADE DO PROFESSOR 🔥
             unidade_limpa = re.sub(r'[^A-Z0-9]', '', str(prof['unidade']).upper())
             
             for turma_nome, dados in turmas_coletadas.items():
@@ -276,7 +283,6 @@ def construir_banco_de_dados():
                 
                 turma_limpa = limpar_nome_aba(turma_nome)
                 
-                # 🔥 APLICA O PREFIXO DA UNIDADE NAS ABAS (ISOLAMENTO MULTI-TENANCY) 🔥
                 if unidade_limpa:
                     sufixo_aba = f"{unidade_limpa}_{turma_limpa}"
                 else:
@@ -290,11 +296,11 @@ def construir_banco_de_dados():
                 try: 
                     ws_al = planilha.worksheet(nome_aba_alunos)
                     ws_al.clear()
-                except: 
+                except Exception: 
                     ws_al = planilha.add_worksheet(title=nome_aba_alunos, rows="100", cols="5")
+                
                 ws_al.update([df_alunos.columns.values.tolist()] + df_alunos.values.tolist())
                 
-                # 🔥 NOMENCLATURA E COLUNAS V45 (Com Disciplina Inserida) 🔥
                 nome_aba_reg = f"registros_{sufixo_aba}"
                 colunas_reg = [
                     "Data", "Resumo", "Para Casa", "Faltas", "Nao_Fez", 
@@ -306,11 +312,10 @@ def construir_banco_de_dados():
                 
                 try: 
                     ws_reg = planilha.worksheet(nome_aba_reg)
-                except:
+                except Exception:
                     ws_reg = planilha.add_worksheet(title=nome_aba_reg, rows="100", cols="16")
                     ws_reg.update([colunas_reg])
                 
-                # 🔥 O PULO DO GATO 2.0: Escreve o DNA deslocado para as colunas N, O e P (Devido à Disciplina) 🔥
                 bloco_dna = [
                     ["CURSO_ACTIVESOFT", "SERIE_ACTIVESOFT", "TURMA_ACTIVESOFT"],
                     [curso, serie, turma]
@@ -318,15 +323,14 @@ def construir_banco_de_dados():
                 
                 try:
                     ws_reg.update(values=bloco_dna, range_name="N1:P2")
-                except:
+                except Exception:
                     ws_reg.update("N1:P2", bloco_dna)
 
                 nome_aba_notas = f"Notas_{sufixo_aba}"
                 try: 
                     planilha.worksheet(nome_aba_notas)
-                except:
+                except Exception:
                     ws_not = planilha.add_worksheet(title=nome_aba_notas, rows="100", cols="20")
-                    # 🔥 MATRIZ DE NOTAS V45: Possui 6 linhas de cabeçalho para abrigar a Disciplina!
                     matriz_base = [["Nº", "Nome da Avaliação"], ["-", "-"], ["-", "-"], ["-", "-"], ["-", "-"], ["-", "-"]]
                     for _, r_aluno in df_alunos.iterrows(): 
                         num_formatado = str(r_aluno['Nº'])[:-2] if str(r_aluno['Nº']).endswith(".0") else str(r_aluno['Nº'])
@@ -345,7 +349,7 @@ def construir_banco_de_dados():
             try:
                 navegador.save_screenshot("erro_scan.png")
                 mandar_print_telegram(prof['chat_id'], "erro_scan.png", f"🚨 *Erro no Robô Scan*\n\nTravei no meio do caminho. Motivo:\n`{str(e)[:150]}`\n\nVeja a foto da tela exata onde eu parei:")
-            except: 
+            except Exception: 
                 pass
             aba_usuarios.update_cell(prof['linha'], 8, "") 
         finally:
