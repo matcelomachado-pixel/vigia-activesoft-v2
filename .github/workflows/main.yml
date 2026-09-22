@@ -31,15 +31,23 @@ jobs:
       - name: Criar credenciais.json
         run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credenciais.json
 
-      # 🔥 RODA O SCAN APENAS NA MÁQUINA 1 (Para não dar conflito)
+      # 🔥 A MÁGICA: Atraso escalonado para não assustar o Google 🔥
+      # Robô 1 não espera (0s), Robô 2 espera 20s, Robô 3 espera 40s.
+      - name: Anti-Gargalo do Google
+        run: sleep $(( (${{ matrix.robo_id }} - 1) * 20 ))
+
+      # RODA O SCAN APENAS NA MÁQUINA 1
       - name: Executar o Vigia Scan
         if: matrix.robo_id == 1
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: python vigia_scan.py
 
-      # 🔥 RODA O DIÁRIO NAS 3 MÁQUINAS AO MESMO TEMPO
+      # RODA O DIÁRIO
       - name: Executar o Vigia Diário
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: python vigia_diario.py
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: python vigia_diario.py
