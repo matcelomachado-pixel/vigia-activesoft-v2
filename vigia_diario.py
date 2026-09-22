@@ -49,7 +49,6 @@ def avisar_telegram(chat_id, mensagem):
     token = os.environ.get("TELEGRAM_TOKEN")
     if not token or not chat_id:
         return
-        
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": mensagem, "parse_mode": "HTML"}
     try:
@@ -57,20 +56,48 @@ def avisar_telegram(chat_id, mensagem):
     except Exception:
         pass
 
-def conectar_sheets(tentativas=5):
-    for i in range(tentativas):
+# 🔥 BLINDAGEM DA API DO GOOGLE SHEETS CONTRA O ERRO 429 🔥
+def conectar_sheets():
+    for tentativa in range(6):
         try:
             creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", SCOPE) 
             client = gspread.authorize(creds)
             return client.open_by_key(SPREADSHEET_ID)
         except Exception as e:
             if '429' in str(e) or 'Quota' in str(e):
-                espera = 15 * (i + 1)
-                print(f"⏳ O Google pediu calma (Limite 429). O Robô vai tomar um café de {espera}s e tentar de novo...")
+                espera = 10 * (tentativa + 1)
+                print(f"⏳ Google API Limite (429). Aguardando {espera}s para reconectar...")
                 time.sleep(espera)
             else:
                 raise e
-    raise Exception("Falha ao conectar no Google Sheets após várias tentativas.")
+    raise Exception("Falha de conexão com o Google Sheets após várias tentativas.")
+
+def safe_get_values(aba):
+    for tentativa in range(6):
+        try:
+            return aba.get_all_values()
+        except Exception as e:
+            if '429' in str(e) or 'Quota' in str(e):
+                espera = 10 * (tentativa + 1)
+                print(f"⏳ Google API Limite (429) na leitura. Aguardando {espera}s...")
+                time.sleep(espera)
+            else:
+                raise e
+    return []
+
+def safe_update(aba, row, col, val):
+    for tentativa in range(6):
+        try:
+            aba.update_cell(row, col, val)
+            return
+        except Exception as e:
+            if '429' in str(e) or 'Quota' in str(e):
+                espera = 10 * (tentativa + 1)
+                print(f"⏳ Google API Limite (429) na escrita. Aguardando {espera}s...")
+                time.sleep(espera)
+            else:
+                return
+
 def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
     navegador.switch_to.default_content()
     try:
@@ -96,6 +123,23 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
             pass
             
     return False
+
+# 🔥 LEITOR DE AVISOS E POP-UPS DO ACTIVESOFT 🔥
+def check_swal_alert(navegador, contexto=""):
+    try:
+        time.sleep(2)
+        swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error') or contains(@class, 'swal2-warning') or contains(@class, 'swal2-info')]")
+        if swal and swal[0].is_displayed():
+            msg = navegador.find_element(By.ID, "swal2-title").text
+            try:
+                btn_confirm = navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
+                navegador.execute_script("arguments[0].click();", btn_confirm)
+            except Exception:
+                pass
+            raise Exception(f"Aviso do Activesoft ({contexto}): {msg}")
+    except Exception as e:
+        if "Aviso do Activesoft" in str(e):
+            raise e
 
 # ================= FUNÇÕES DO DIÁRIO =================
 def lancar_ocorrencias(navegador, wait, aula):
@@ -125,7 +169,10 @@ def lancar_ocorrencias(navegador, wait, aula):
         xpath_pesquisar = "//button[normalize-space(text())='Pesquisar']"
         botao_pesquisar = wait.until(EC.element_to_be_clickable((By.XPATH, xpath_pesquisar)))
         navegador.execute_script("arguments[0].click();", botao_pesquisar)
-        time.sleep(5) 
+        
+        print("   [Ocorrências] Aguardando lista de alunos...")
+        time.sleep(4)
+        check_swal_alert(navegador, "Ocorrências")
         
         turma_exata = aula['turma_ativa'].upper()
         num_t = "".join([c for c in aula['turma_ativa'] if c.isdigit()])
@@ -140,6 +187,7 @@ def lancar_ocorrencias(navegador, wait, aula):
                         if "/" in td.text and ("ANO" in td.text.upper() or "SÉRIE" in td.text.upper() or "SERIE" in td.text.upper()):
                             texto_turma = td.text.upper().strip()
                             break
+                            
                     if not texto_turma:
                         texto_turma = linha.text.upper().strip()
                         
@@ -217,7 +265,7 @@ def lancar_ocorrencias(navegador, wait, aula):
             pass
 
     except Exception as e:
-        raise Exception(f"Erro no preenchimento das ocorrências: {e}")
+        raise Exception(f"Erro nas Ocorrências: {e}")
     finally:
         try:
             navegador.switch_to.default_content()
@@ -233,7 +281,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
     turma_exata = aula['turma_ativa']
     
     if not curso or not serie_busca or not turma_exata:
-        raise Exception("DNA Activesoft ausente.")
+        raise Exception("DNA Activesoft ausente. Turma não mapeada corretamente.")
         
     print(f"   [Frequência] Iniciando chamada para {turma_exata}...")
     try:
@@ -241,6 +289,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             navegador.switch_to.default_content()
         except Exception:
             pass
+            
         time.sleep(2)
         
         try:
@@ -311,7 +360,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
-                        
                 time.sleep(2.5) 
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
@@ -341,11 +389,18 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         try:
             botao_consultar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Consultar']")))
             navegador.execute_script("arguments[0].click();", botao_consultar)
-            time.sleep(8) 
-        except Exception:
-            raise Exception("O botão 'Consultar' estava bloqueado.")
+            
+            print("   [Frequência] Aguardando lista de alunos carregar...")
+            time.sleep(6) 
+            
+            # 🔥 LEITOR DE AVISOS NAS FALTAS (Vai capturar se for fora do período) 🔥
+            check_swal_alert(navegador, "Frequência")
+            
+        except Exception as e:
+            if "Aviso do Activesoft" in str(e):
+                raise e
+            raise Exception("O botão 'Consultar' estava bloqueado ou não carregou.")
         
-        # 🔥 A VACINA DO EFEITO CASCATA ESTÁ AQUI 🔥
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
             time.sleep(0.5)
@@ -355,8 +410,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 navegador.execute_script("arguments[0].click();", botao_alvo) 
             time.sleep(1) 
             
-            # Lê a tela de baixo para cima (reversed) para pegar o menu suspenso recém-aberto
-            # e ignorar os alunos que já tiveram a falta marcada acima.
             xpath = f"//*[normalize-space(text())='{texto_opcao}']"
             opcoes = navegador.find_elements(By.XPATH, xpath)
             for op in reversed(opcoes):
@@ -371,7 +424,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         except Exception:
                             navegador.execute_script("arguments[0].click();", op)
                             return
-                            
             if opcoes:
                 navegador.execute_script("arguments[0].click();", opcoes[-1])
 
@@ -380,7 +432,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             clicar_opcao_tabela(botao_selecione, "Presente")
             time.sleep(3) 
         except Exception as e:
-            raise Exception(f"A tabela de alunos não carregou.")
+            raise Exception(f"A tabela de alunos não carregou (O botão 'Selecione' não apareceu).")
             
         faltas_str = str(aula.get('faltas', '')).strip()
         mapa_alunos = aula.get('mapa_alunos', {})
@@ -396,13 +448,11 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         partes = nome_aluno.upper().split()
                         primeiro_nome = partes[0]
                         ultimo_nome = partes[-1] if len(partes) > 1 else partes[0]
-                        
                         xpath_nome = f"//tr[contains(translate(., 'abcdefghijklmnopqrstuvwxyzáéíóúâêôãõç', 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÂÊÔÃÕÇ'), '{primeiro_nome}') and contains(translate(., 'abcdefghijklmnopqrstuvwxyzáéíóúâêôãõç', 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÂÊÔÃÕÇ'), '{ultimo_nome}')]"
-                        
                         linhas = navegador.find_elements(By.XPATH, xpath_nome)
                         if linhas:
                             linha_alvo = linhas[0]
-                            print(f"      - Encontrou aluno {num} ({primeiro_nome} {ultimo_nome}) pelo NOME blindado.")
+                            print(f"      - Encontrou aluno {num} ({primeiro_nome} {ultimo_nome}) pelo Nome.")
                             
                     if not linha_alvo:
                         indice_linha = int(num) + 1 
@@ -434,19 +484,10 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 time.sleep(3)
             except Exception:
                 pass
-                
         except Exception:
             raise Exception("Não consegui encontrar ou clicar no botão 'Salvar'.")
             
-        try:
-            erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
-            if erro_swal and erro_swal[0].is_displayed():
-                titulo_erro = navegador.find_element(By.ID, "swal2-title").text
-                navegador.execute_script("arguments[0].click();", navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]"))
-                raise Exception(f"Aviso: {titulo_erro}")
-        except Exception as e_swal:
-            if "Aviso" in str(e_swal):
-                raise e_swal
+        check_swal_alert(navegador, "Salvar Frequência")
                 
     except Exception as e:
         raise Exception(f"Falha na Frequência: {e}")
@@ -475,6 +516,7 @@ def lancar_notas(navegador, wait, nota_info):
                 
         if input_escondido:
             break
+            
         time.sleep(1.5)
         
     if not input_escondido:
@@ -595,14 +637,13 @@ def lancar_notas(navegador, wait, nota_info):
                     time.sleep(0.5)
             except Exception:
                 pass
-                
     except Exception as e:
         raise e
 
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V45.1 (CAÇADOR DE NOMES + REVERSE FIX)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V46 (ANTI-API LIMIT + LEITOR DE AVISOS - FULL CODE)")
     print("="*60)
     
     try:
@@ -610,7 +651,7 @@ def vigiar():
         usuarios_cadastrados = {}
         
         try:
-            dados_usuarios = planilha.worksheet("Usuarios").get_all_values()
+            dados_usuarios = safe_get_values(planilha.worksheet("Usuarios"))
             for row in dados_usuarios[1:]:
                 if len(row) >= 7 and str(row[0]).strip():
                     usuarios_cadastrados[str(row[0]).strip()] = {
@@ -630,7 +671,7 @@ def vigiar():
         abas_registros = [aba for aba in planilha.worksheets() if aba.title.startswith("registros_")]
         for aba in abas_registros:
             turma_nome = aba.title.replace("registros_", "")
-            dados_brutos = aba.get_all_values()
+            dados_brutos = safe_get_values(aba)
             
             if len(dados_brutos) < 2:
                 continue
@@ -638,7 +679,7 @@ def vigiar():
             nome_aba_alunos = aba.title.replace("registros_", "alunos_")
             mapa_alunos_turma = {}
             try:
-                dados_alunos = planilha.worksheet(nome_aba_alunos).get_all_values()
+                dados_alunos = safe_get_values(planilha.worksheet(nome_aba_alunos))
                 for r in dados_alunos[1:]:
                     if len(r) >= 2 and str(r[0]).strip():
                         mapa_alunos_turma[str(r[0]).strip()] = str(r[1]).strip()
@@ -654,16 +695,17 @@ def vigiar():
                 serie_ativo = str(dados_brutos[1][idx_serie]).strip()
                 turma_ativa = str(dados_brutos[1][idx_turma]).strip()
             except Exception:
-                curso_ativo, serie_ativo, turma_ativa = "", "", ""
+                curso_ativo = ""
+                serie_ativo = ""
+                turma_ativa = ""
             
-            cabecalhos = [str(c).strip().upper() for c in dados_brutos[0]]
             col_diario = -1
             col_ocorrencia = -1
             col_falta = -1
             col_id_prof = -1
             col_disciplina = -1
             
-            for i, c in enumerate(cabecalhos):
+            for i, c in enumerate(cabecalhos_reg):
                 if "DIARIO" in c or "DIÁRIO" in c or c == "STATUS":
                     col_diario = i
                 if "OCORRENCIA" in c or "OCORRÊNCIA" in c:
@@ -680,13 +722,13 @@ def vigiar():
             
             for indice, row in enumerate(dados_brutos[1:]):
                 linha_sheets = indice + 2 
-                while len(row) < max(len(cabecalhos), 15):
+                while len(row) < max(len(cabecalhos_reg), 15):
                     row.append("") 
                     
                 linha_dict = {}
-                for i in range(min(len(cabecalhos), len(row))):
-                    linha_dict[cabecalhos[i]] = row[i]
-                
+                for i in range(min(len(cabecalhos_reg), len(row))):
+                    linha_dict[cabecalhos_reg[i]] = row[i]
+                    
                 data_aula = str(linha_dict.get("DATA", row[0])).strip()
                 if not data_aula:
                     continue
@@ -728,7 +770,7 @@ def vigiar():
                         "nao_fez": str(linha_dict.get("NAO_FEZ", "")).strip(), 
                         "tarefa_nao_feita": str(linha_dict.get("TAREFA_NAO_FEITA", "")).strip(),
                         "faltas": str(linha_dict.get("FALTAS", "")).strip(), 
-                        "tipo_lancamento": st_falta,
+                        "tipo_lancamento": st_falta, 
                         "disciplina": disciplina_texto,
                         "curso_ativo": curso_ativo, 
                         "serie_ativo": serie_ativo, 
@@ -739,7 +781,7 @@ def vigiar():
         abas_notas = [aba for aba in planilha.worksheets() if aba.title.startswith("Notas_")]
         for aba in abas_notas:
             turma_nome = aba.title.replace("Notas_", "")
-            dados = aba.get_all_values()
+            dados = safe_get_values(aba)
             
             if len(dados) < 7:
                 continue
@@ -761,6 +803,7 @@ def vigiar():
                     
                     disciplina_prova = str(dados[5][col_idx]).strip()
                     notas_alunos = {}
+                    
                     for row_idx in range(6, len(dados)):
                         numero_aluno = str(dados[row_idx][0]).strip()
                         nota = str(dados[row_idx][col_idx]).strip()
@@ -805,7 +848,12 @@ def vigiar():
             
             etapa_atual = "2ª Etapa"
             try:
-                valor_cru = str(planilha.worksheet(dados_prof['aba_config']).acell("B1").value).strip().lower()
+                try:
+                    val = planilha.worksheet(dados_prof['aba_config']).acell("B1").value
+                except Exception:
+                    val = ""
+                    
+                valor_cru = str(val).strip().lower()
                 if "rec" in valor_cru and "1" in valor_cru:
                     etapa_atual = "Recup. 1ª Etapa"
                 elif "rec" in valor_cru and "2" in valor_cru:
@@ -841,11 +889,11 @@ def vigiar():
                 # --- PROCESSA AS AULAS ---
                 for aula in minhas_aulas:
                     if "Pendente" in aula['status_diario']:
-                        aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Processando...")
+                        safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_diario'], "Processando...")
                     if "Pendente" in aula['status_ocorrencia']:
-                        aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Processando...")
+                        safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_ocorrencia'], "Processando...")
                     if "Pendente" in aula['status_falta']:
-                        aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Processando...")
+                        safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_falta'], "Processando...")
 
                     print(f"\n -> Iniciando Aula: {aula['turma']} ({aula['data']})")
                     relatorio_telegram += f"🏫 <b>{aula['turma']} ({aula['data']})</b>\n"
@@ -1002,69 +1050,49 @@ def vigiar():
                                 except Exception as e_a: 
                                     if "Alerta nativo" in str(e_a):
                                         raise e_a
-                                        
-                                try:
-                                    erro_swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error')]")
-                                    if erro_swal and erro_swal[0].is_displayed():
-                                        titulo_erro = navegador.find_element(By.ID, "swal2-title").text
-                                        navegador.execute_script("arguments[0].click();", navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]"))
-                                        raise Exception(f"Aviso na tela: {titulo_erro}")
-                                        
-                                    btn_sim = navegador.find_elements(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
-                                    if btn_sim and btn_sim[0].is_displayed():
-                                        navegador.execute_script("arguments[0].click();", btn_sim[0])
-                                except Exception as c_e:
-                                    if "Aviso na tela" in str(c_e):
-                                        raise c_e
-                                    
-                                for err in navegador.find_elements(By.XPATH, "//*[contains(translate(text(), 'ERRO', 'erro'), 'erro') or contains(translate(text(), 'NÃO É POSSÍVEL', 'não é possível'), 'não é possível')]"):
-                                    if err.is_displayed():
-                                        try:
-                                            motivo = err.find_element(By.XPATH, "..").text
-                                        except Exception:
-                                            motivo = err.text
-                                        raise Exception(f"Aviso na tela: {motivo.replace(chr(10), ' - ')}")
-                                    
-                                aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Lançado")
+                                
+                                check_swal_alert(navegador, "Gravar Diário")
+                                
+                                safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_diario'], "Lançado")
                                 print("   [Diário] ✅ Gravado com sucesso.")
                                 relatorio_telegram += "  ✅ Diário gravado.\n"
                                 
                             except Exception as e_diario:
-                                aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
+                                safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
                                 relatorio_telegram += f"  ❌ Erro Diário: {str(e_diario)[:80]}\n"
 
                         if aula['status_ocorrencia'] in ["Pendente", "Pendente_Nova", "Processando..."]:
                             try:
                                 lancar_ocorrencias(navegador, wait, aula)
-                                aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Lançado")
+                                safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_ocorrencia'], "Lançado")
                                 print("   [Ocorrências] ✅ Gravadas com sucesso.")
                                 relatorio_telegram += "  ✅ Ocorrências gravadas.\n"
                             except Exception as e_ocor:
-                                aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
+                                safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
                                 relatorio_telegram += f"  ❌ Erro Ocorrências: {str(e_ocor)[:80]}\n"
 
                         if aula['status_falta'] in ["Pendente", "Pendente_Nova", "Processando..."]:
                             try:
                                 lancar_faltas(navegador, wait, aula, etapa_atual)
-                                aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Lançado")
+                                safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_falta'], "Lançado")
                                 print("   [Faltas] ✅ Gravadas com sucesso.")
                                 relatorio_telegram += "  ✅ Faltas gravadas.\n"
                             except Exception as e_falta:
-                                aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
-                                relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:80]}\n"
+                                safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
+                                relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:100]}\n"
                                 
                     except Exception as erro_abrir_painel:
                         if "Processando..." in aula['status_diario'] or "Pendente" in aula['status_diario']:
-                            aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
+                            safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
                         if "Processando..." in aula['status_ocorrencia'] or "Pendente" in aula['status_ocorrencia']:
-                            aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
+                            safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
                         if "Processando..." in aula['status_falta'] or "Pendente" in aula['status_falta']:
-                            aula['aba'].update_cell(aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
+                            safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
                         relatorio_telegram += "  🚨 Falha geral ao abrir a turma no painel.\n"
 
                 # --- PROCESSA AS NOTAS ---
                 for nota in minhas_notas:
-                    nota['aba'].update_cell(3, nota['coluna_planilha'], "Processando...")
+                    safe_update(nota['aba'], 3, nota['coluna_planilha'], "Processando...")
                     nota['etapa'] = etapa_atual
                     print(f"\n -> Iniciando Notas: {nota['nome_prova']} ({nota['turma']})")
                     relatorio_telegram += f"\n📝 <b>Notas: {nota['nome_prova']} ({nota['turma']})</b>\n"
@@ -1098,15 +1126,14 @@ def vigiar():
                             raise Exception(f"Turma '{turma_busca}' não foi achada na tela de notas.")
                             
                         time.sleep(6) 
-                        
                         lancar_notas(navegador, wait, nota)
                         
-                        nota['aba'].update_cell(3, nota['coluna_planilha'], "Lançado")
+                        safe_update(nota['aba'], 3, nota['coluna_planilha'], "Lançado")
                         print("   [Notas] ✅ Prova lançada com sucesso.")
                         relatorio_telegram += "  ✅ Prova lançada com sucesso.\n"
                         
                     except Exception as e_nota:
-                        nota['aba'].update_cell(3, nota['coluna_planilha'], "Erro Sistema")
+                        safe_update(nota['aba'], 3, nota['coluna_planilha'], "Erro Sistema")
                         relatorio_telegram += f"  ❌ Erro ao lançar: {str(e_nota)[:80]}\n"
 
             finally:
