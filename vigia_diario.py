@@ -56,7 +56,6 @@ def avisar_telegram(chat_id, mensagem):
     except Exception:
         pass
 
-# 🔥 BLINDAGEM DA API DO GOOGLE SHEETS CONTRA O ERRO 429 🔥
 def conectar_sheets():
     for tentativa in range(6):
         try:
@@ -124,21 +123,27 @@ def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
             
     return False
 
-# 🔥 LEITOR DE AVISOS E POP-UPS DO ACTIVESOFT 🔥
+# 🔥 LEITOR DE AVISOS TOTAL (Lê qualquer bloqueio do Activesoft) 🔥
 def check_swal_alert(navegador, contexto=""):
     try:
         time.sleep(2)
-        swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-icon-error') or contains(@class, 'swal2-error') or contains(@class, 'swal2-warning') or contains(@class, 'swal2-info')]")
+        swal = navegador.find_elements(By.XPATH, "//div[contains(@class, 'swal2-popup')]")
         if swal and swal[0].is_displayed():
             msg = navegador.find_element(By.ID, "swal2-title").text
+            conteudo = ""
+            try:
+                conteudo = navegador.find_element(By.ID, "swal2-content").text
+            except Exception:
+                pass
+                
             try:
                 btn_confirm = navegador.find_element(By.XPATH, "//button[contains(@class, 'swal2-confirm')]")
                 navegador.execute_script("arguments[0].click();", btn_confirm)
             except Exception:
                 pass
-            raise Exception(f"Aviso do Activesoft ({contexto}): {msg}")
+            raise Exception(f"Alerta do Site ({contexto}): {msg} {conteudo}")
     except Exception as e:
-        if "Aviso do Activesoft" in str(e):
+        if "Alerta do Site" in str(e):
             raise e
 
 # ================= FUNÇÕES DO DIÁRIO =================
@@ -173,6 +178,11 @@ def lancar_ocorrencias(navegador, wait, aula):
         print("   [Ocorrências] Aguardando lista de alunos...")
         time.sleep(4)
         check_swal_alert(navegador, "Ocorrências")
+        
+        try:
+            wait.until(EC.presence_of_element_located((By.XPATH, "//tbody/tr")))
+        except Exception:
+            raise Exception("A tabela não carregou ou retornou vazia após clicar em Pesquisar.")
         
         turma_exata = aula['turma_ativa'].upper()
         num_t = "".join([c for c in aula['turma_ativa'] if c.isdigit()])
@@ -279,6 +289,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
     curso = aula['curso_ativo']
     serie_busca = aula['serie_ativo']
     turma_exata = aula['turma_ativa']
+    disciplina_busca = aula.get('disciplina', '').strip()
     
     if not curso or not serie_busca or not turma_exata:
         raise Exception("DNA Activesoft ausente. Turma não mapeada corretamente.")
@@ -364,9 +375,12 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
 
+        # 🔥 INJEÇÃO DA DISCIPLINA ANTES DA ETAPA 🔥
         preencher_select_blindado(1, curso)        
         preencher_select_blindado(2, serie_busca)       
-        preencher_select_blindado(3, turma_exata)  
+        preencher_select_blindado(3, turma_exata)
+        if disciplina_busca:
+            preencher_select_blindado(4, disciplina_busca)
         preencher_select_blindado(5, etapa_atual)
         
         try:
@@ -393,13 +407,12 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             print("   [Frequência] Aguardando lista de alunos carregar...")
             time.sleep(6) 
             
-            # 🔥 LEITOR DE AVISOS NAS FALTAS (Vai capturar se for fora do período) 🔥
             check_swal_alert(navegador, "Frequência")
             
         except Exception as e:
-            if "Aviso do Activesoft" in str(e):
+            if "Alerta do Site" in str(e):
                 raise e
-            raise Exception("O botão 'Consultar' estava bloqueado ou não carregou.")
+            raise Exception("O botão 'Consultar' estava bloqueado.")
         
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
@@ -427,12 +440,14 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             if opcoes:
                 navegador.execute_script("arguments[0].click();", opcoes[-1])
 
+        # 🔥 FIM DA DEPENDÊNCIA DA PALAVRA 'SELECIONE' 🔥
         try:
-            botao_selecione = wait.until(EC.presence_of_element_located((By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton') and contains(., 'Selecione')])[1]")))
-            clicar_opcao_tabela(botao_selecione, "Presente")
+            wait.until(EC.presence_of_element_located((By.XPATH, "//tbody/tr")))
+            botao_mestre = navegador.find_element(By.XPATH, "(//button[contains(@class, 'Toggle__ToggleButton')])[1]")
+            clicar_opcao_tabela(botao_mestre, "Presente")
             time.sleep(3) 
         except Exception as e:
-            raise Exception(f"A tabela de alunos não carregou (O botão 'Selecione' não apareceu).")
+            raise Exception(f"A tabela não carregou ou retornou vazia após clicar em Consultar.")
             
         faltas_str = str(aula.get('faltas', '')).strip()
         mapa_alunos = aula.get('mapa_alunos', {})
@@ -643,7 +658,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V46 (ANTI-API LIMIT + LEITOR DE AVISOS - FULL CODE)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V46.1 (NO SELECIONE DEPENDENCY + POPUP FULL)")
     print("="*60)
     
     try:
