@@ -57,11 +57,20 @@ def avisar_telegram(chat_id, mensagem):
     except Exception:
         pass
 
-def conectar_sheets():
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", SCOPE) 
-    client = gspread.authorize(creds)
-    return client.open_by_key(SPREADSHEET_ID)
-
+def conectar_sheets(tentativas=5):
+    for i in range(tentativas):
+        try:
+            creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", SCOPE) 
+            client = gspread.authorize(creds)
+            return client.open_by_key(SPREADSHEET_ID)
+        except Exception as e:
+            if '429' in str(e) or 'Quota' in str(e):
+                espera = 15 * (i + 1)
+                print(f"⏳ O Google pediu calma (Limite 429). O Robô vai tomar um café de {espera}s e tentar de novo...")
+                time.sleep(espera)
+            else:
+                raise e
+    raise Exception("Falha ao conectar no Google Sheets após várias tentativas.")
 def achar_e_clicar(navegador, xpath_alvo, tempo_espera=3):
     navegador.switch_to.default_content()
     try:
