@@ -367,18 +367,41 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             raise Exception(f"A tabela de alunos não carregou.")
             
         faltas_str = str(aula.get('faltas', '')).strip()
+        mapa_alunos = aula.get('mapa_alunos', {}) # 🔥 MAPA DE ALUNOS INSERIDO AQUI
+        
         if faltas_str:
             numeros_falta = [n.strip() for n in faltas_str.split(',')]
             for num in numeros_falta:
                 try:
-                    indice_linha = int(num) + 1 
-                    xpath_linha = f"(//tbody/tr)[{indice_linha}]"
-                    linha = navegador.find_element(By.XPATH, xpath_linha)
-                    botao_status = linha.find_element(By.XPATH, ".//button[contains(@class, 'Toggle__ToggleButton')]")
+                    nome_aluno = mapa_alunos.get(num, "")
+                    linha_alvo = None
+                    
+                    if nome_aluno:
+                        # 🔥 CAÇADOR DE NOMES CEGO PARA MAIÚSCULO/MINÚSCULO 🔥
+                        partes = nome_aluno.upper().split()
+                        primeiro_nome = partes[0]
+                        ultimo_nome = partes[-1] if len(partes) > 1 else partes[0]
+                        
+                        # Usa o XPath para traduzir o texto da tela para maiúsculo e bater com o nome da planilha
+                        xpath_nome = f"//tr[contains(translate(., 'abcdefghijklmnopqrstuvwxyzáéíóúâêôãõç', 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÂÊÔÃÕÇ'), '{primeiro_nome}') and contains(translate(., 'abcdefghijklmnopqrstuvwxyzáéíóúâêôãõç', 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÂÊÔÃÕÇ'), '{ultimo_nome}')]"
+                        
+                        linhas = navegador.find_elements(By.XPATH, xpath_nome)
+                        if linhas:
+                            linha_alvo = linhas[0]
+                            print(f"      - Encontrou aluno {num} ({primeiro_nome} {ultimo_nome}) por nome.")
+                            
+                    # Se o nome não estiver na planilha ou der erro, usa o método antigo de índice como último recurso
+                    if not linha_alvo:
+                        indice_linha = int(num) + 1 
+                        xpath_linha_indice = f"(//tbody/tr)[{indice_linha}]"
+                        linha_alvo = navegador.find_element(By.XPATH, xpath_linha_indice)
+                        print(f"      - Usando índice de linha para o aluno {num}.")
+                        
+                    botao_status = linha_alvo.find_element(By.XPATH, ".//button[contains(@class, 'Toggle__ToggleButton')]")
                     clicar_opcao_tabela(botao_status, "Falta")
                     time.sleep(1)
-                except Exception:
-                    pass
+                except Exception as erro_falta:
+                    print(f"   [Frequência] ⚠️ Falha ao marcar falta para o aluno nº {num}: {erro_falta}")
         
         try:
             botao_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space(text())='Salvar']")))
@@ -566,7 +589,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V45 (MULTI-WORKERS + DISCIPLINA)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V45 (NOME ALUNO NAS FALTAS)")
     print("="*60)
     
     try:
@@ -598,6 +621,17 @@ def vigiar():
             
             if len(dados_brutos) < 2:
                 continue
+                
+            # 🔥 NOVO: MAPEAR ALUNOS DESTA TURMA 🔥
+            nome_aba_alunos = aba.title.replace("registros_", "alunos_")
+            mapa_alunos_turma = {}
+            try:
+                dados_alunos = planilha.worksheet(nome_aba_alunos).get_all_values()
+                for r in dados_alunos[1:]:
+                    if len(r) >= 2 and str(r[0]).strip():
+                        mapa_alunos_turma[str(r[0]).strip()] = str(r[1]).strip()
+            except Exception:
+                pass
             
             try:
                 cabecalhos_reg = [str(c).strip().upper() for c in dados_brutos[0]]
@@ -659,7 +693,6 @@ def vigiar():
                 id_prof = str(row[col_id_prof]).strip()
                 disciplina_texto = str(row[col_disciplina]).strip() if col_disciplina != -1 else ""
                 
-                # 🔥 O CADEADO INICIAL (FILTRA QUEM JÁ ESTÁ PROCESSANDO) 🔥
                 if id_prof and ("Pendente" in st_diario or "Pendente" in st_ocor or "Pendente" in st_falta):
                     if "Processando" in st_diario or "Processando" in st_ocor or "Processando" in st_falta:
                         continue
@@ -687,7 +720,8 @@ def vigiar():
                         "disciplina": disciplina_texto,
                         "curso_ativo": curso_ativo, 
                         "serie_ativo": serie_ativo, 
-                        "turma_ativa": turma_ativa    
+                        "turma_ativa": turma_ativa,
+                        "mapa_alunos": mapa_alunos_turma # 🔥 MAPA INSERIDO AQUI PARA A FUNÇÃO DE FALTAS
                     })
 
         abas_notas = [aba for aba in planilha.worksheets() if aba.title.startswith("Notas_")]
