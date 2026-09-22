@@ -13,6 +13,7 @@ from selenium.webdriver.common.keys import Keys
 import urllib3
 import ssl
 import requests
+from cryptography.fernet import Fernet
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 try: 
@@ -340,7 +341,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     navegador.execute_script("arguments[0].parentNode.parentNode.click();", inp)
                 except Exception:
                     pass
-                    
                 time.sleep(1)
                 
                 navegador.execute_script("arguments[0].focus();", inp)
@@ -372,7 +372,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", inp)
                         time.sleep(0.5)
                         navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", inp)
-                        
                 time.sleep(2.5) 
             except Exception as e:
                 print(f"   [Frequência] ⚠️ Falha ao preencher filtro {idx}: {e}")
@@ -381,7 +380,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         preencher_select_blindado(2, serie_busca)       
         preencher_select_blindado(3, turma_exata)
         
-        # 🔥 A CORREÇÃO DA 2ª SÉRIE: Espera a tela reagir e só então conta as caixas geradas 🔥
         print("   [Frequência] Analisando filtros dinâmicos de disciplina...")
         time.sleep(3)
         inps_tela = navegador.find_elements(By.XPATH, "//input[contains(@id, 'react-select') or @aria-autocomplete='list']")
@@ -392,7 +390,6 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 preencher_select_blindado(4, disciplina_busca)
             preencher_select_blindado(5, etapa_atual)
         elif qtd_caixas == 5:
-            # Não tem caixa de disciplina para essa turma. A Etapa é a caixa 4.
             preencher_select_blindado(4, etapa_atual)
         else:
             preencher_select_blindado(qtd_caixas - 1, etapa_atual)
@@ -663,14 +660,13 @@ def lancar_notas(navegador, wait, nota_info):
                     time.sleep(0.5)
             except Exception:
                 pass
-                
     except Exception as e:
         raise e
 
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V47 (CADEADO IMEDIATO + CAIXAS DINÂMICAS + FULL EXPAND)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V48 (CRIPTOGRAFIA AES ATIVADA)")
     print("="*60)
     
     try:
@@ -681,11 +677,22 @@ def vigiar():
             dados_usuarios = safe_get_values(planilha.worksheet("Usuarios"))
             for row in dados_usuarios[1:]:
                 if len(row) >= 7 and str(row[0]).strip():
+                    senha_banco = str(row[5]).strip()
+                    
+                    # 🔥 DESEMBARALHADOR DA SENHA 🔥
+                    try:
+                        vigia_key = os.environ.get("VIGIA_KEY")
+                        if vigia_key:
+                            fernet = Fernet(vigia_key.encode('utf-8'))
+                            senha_banco = fernet.decrypt(senha_banco.encode('utf-8')).decode('utf-8')
+                    except Exception:
+                        pass # Se falhar, usa o valor original para não quebrar cadastros antigos
+                        
                     usuarios_cadastrados[str(row[0]).strip()] = {
                         "nome": str(row[1]).strip(), 
                         "codigo": str(row[3]).strip(),
                         "login": str(row[4]).strip(), 
-                        "senha": str(row[5]).strip(),
+                        "senha": senha_banco,
                         "aba_config": str(row[6]).strip()
                     }
         except Exception as e:
@@ -778,7 +785,6 @@ def vigiar():
                     if "Processando" in st_diario or "Processando" in st_ocor or "Processando" in st_falta:
                         continue
                         
-                    # 🔥 CADEADO IMEDIATO (Impede duplicidade no Multi-Workers) 🔥
                     if st_diario in ["Pendente", "Pendente_Nova"]:
                         safe_update(aba, linha_sheets, col_diario + 1, "Processando...")
                     if st_ocor in ["Pendente", "Pendente_Nova"]:
@@ -827,7 +833,6 @@ def vigiar():
                     if not id_prof:
                         continue
                     
-                    # 🔥 CADEADO IMEDIATO PARA NOTAS 🔥
                     safe_update(aba, 3, col_idx + 1, "Processando...")
                     
                     data_prova_crua = str(dados[3][col_idx]).strip()
