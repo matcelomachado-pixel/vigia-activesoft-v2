@@ -336,6 +336,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         except Exception:
             raise Exception("O botão 'Consultar' estava bloqueado.")
         
+        # 🔥 A VACINA DO EFEITO CASCATA ESTÁ AQUI 🔥
         def clicar_opcao_tabela(botao_alvo, texto_opcao):
             navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao_alvo)
             time.sleep(0.5)
@@ -345,17 +346,23 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                 navegador.execute_script("arguments[0].click();", botao_alvo) 
             time.sleep(1) 
             
+            # Lê a tela de baixo para cima (reversed) para pegar o menu suspenso recém-aberto
+            # e ignorar os alunos que já tiveram a falta marcada acima.
             xpath = f"//*[normalize-space(text())='{texto_opcao}']"
             opcoes = navegador.find_elements(By.XPATH, xpath)
-            for op in opcoes:
+            for op in reversed(opcoes):
                 if op.is_displayed(): 
                     try:
                         op.click()
                         return
                     except Exception:
-                        webdriver.ActionChains(navegador).move_to_element(op).click().perform()
-                        return
-                        
+                        try:
+                            webdriver.ActionChains(navegador).move_to_element(op).click().perform()
+                            return
+                        except Exception:
+                            navegador.execute_script("arguments[0].click();", op)
+                            return
+                            
             if opcoes:
                 navegador.execute_script("arguments[0].click();", opcoes[-1])
 
@@ -367,7 +374,7 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
             raise Exception(f"A tabela de alunos não carregou.")
             
         faltas_str = str(aula.get('faltas', '')).strip()
-        mapa_alunos = aula.get('mapa_alunos', {}) # 🔥 MAPA DE ALUNOS INSERIDO AQUI
+        mapa_alunos = aula.get('mapa_alunos', {})
         
         if faltas_str:
             numeros_falta = [n.strip() for n in faltas_str.split(',')]
@@ -377,20 +384,17 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
                     linha_alvo = None
                     
                     if nome_aluno:
-                        # 🔥 CAÇADOR DE NOMES CEGO PARA MAIÚSCULO/MINÚSCULO 🔥
                         partes = nome_aluno.upper().split()
                         primeiro_nome = partes[0]
                         ultimo_nome = partes[-1] if len(partes) > 1 else partes[0]
                         
-                        # Usa o XPath para traduzir o texto da tela para maiúsculo e bater com o nome da planilha
                         xpath_nome = f"//tr[contains(translate(., 'abcdefghijklmnopqrstuvwxyzáéíóúâêôãõç', 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÂÊÔÃÕÇ'), '{primeiro_nome}') and contains(translate(., 'abcdefghijklmnopqrstuvwxyzáéíóúâêôãõç', 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÂÊÔÃÕÇ'), '{ultimo_nome}')]"
                         
                         linhas = navegador.find_elements(By.XPATH, xpath_nome)
                         if linhas:
                             linha_alvo = linhas[0]
-                            print(f"      - Encontrou aluno {num} ({primeiro_nome} {ultimo_nome}) por nome.")
+                            print(f"      - Encontrou aluno {num} ({primeiro_nome} {ultimo_nome}) pelo NOME blindado.")
                             
-                    # Se o nome não estiver na planilha ou der erro, usa o método antigo de índice como último recurso
                     if not linha_alvo:
                         indice_linha = int(num) + 1 
                         xpath_linha_indice = f"(//tbody/tr)[{indice_linha}]"
@@ -589,7 +593,7 @@ def lancar_notas(navegador, wait, nota_info):
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
-    print(" 🚀 VIGIA ASSESSOR.IA: V45 (NOME ALUNO NAS FALTAS)")
+    print(" 🚀 VIGIA ASSESSOR.IA: V45.1 (CAÇADOR DE NOMES + REVERSE FIX)")
     print("="*60)
     
     try:
@@ -622,7 +626,6 @@ def vigiar():
             if len(dados_brutos) < 2:
                 continue
                 
-            # 🔥 NOVO: MAPEAR ALUNOS DESTA TURMA 🔥
             nome_aba_alunos = aba.title.replace("registros_", "alunos_")
             mapa_alunos_turma = {}
             try:
@@ -721,7 +724,7 @@ def vigiar():
                         "curso_ativo": curso_ativo, 
                         "serie_ativo": serie_ativo, 
                         "turma_ativa": turma_ativa,
-                        "mapa_alunos": mapa_alunos_turma # 🔥 MAPA INSERIDO AQUI PARA A FUNÇÃO DE FALTAS
+                        "mapa_alunos": mapa_alunos_turma
                     })
 
         abas_notas = [aba for aba in planilha.worksheets() if aba.title.startswith("Notas_")]
@@ -859,7 +862,6 @@ def vigiar():
                         disciplina_busca = aula.get('disciplina', '').strip().upper()
                         
                         if disciplina_busca:
-                            print(f"   [Filtro Extra] Lente da Disciplina ligada: Procurando a palavra '{disciplina_busca}'.")
                             xpath_diario = f"//*[contains(text(), '{turma_busca}')]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_busca}')]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//a[contains(text(), 'Diário de classe')]"
                         else:
                             xpath_diario = f"//*[contains(text(), '{turma_busca}')]/ancestor::tr//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_busca}')]/ancestor::div[contains(@class, 'card')]//a[contains(text(), 'Diário de classe')]"
