@@ -1148,8 +1148,20 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'].upper().strip())
+                                                # 🔥 NOVO TRADUTOR: Decodifica M2FERNODIAS_8A para 8º ANO A
+                        aba_nota_limpa = nota['turma'].upper().strip()
+                        match = re.search(r'(\d)([A-E])?$', aba_nota_limpa)
+                        
+                        if match:
+                            num = match.group(1)
+                            letra = match.group(2) or ""
+                            nome_traduzido = f"{num}ª SÉRIE" if num in ['1', '2', '3'] else f"{num}º ANO {letra}".strip()
+                        else:
+                            nome_traduzido = aba_nota_limpa
+                            
+                        turma_busca = MAPA_TURMAS.get(nome_traduzido, nome_traduzido)
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
+
                         
                         if disciplina_busca:
                             xpath_notas = f"//*[contains(text(), '{turma_busca}')]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_busca}')]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')]"
