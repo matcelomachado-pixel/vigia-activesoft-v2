@@ -1171,10 +1171,15 @@ def vigiar():
                         if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
                             raise Exception(f"Turma '{turma_busca}' não foi achada na tela de notas.")
                             
-                        time.sleep(6) 
+                                                time.sleep(6) 
+                        
+                        # 🔥 CORREÇÃO: Injetando a etapa atual no pacote antes de lançar
+                        nota['etapa'] = etapa_atual 
+                        
                         lancar_notas(navegador, wait, nota)
                         
                         safe_update(nota['aba'], 3, nota['coluna_planilha'], "Lançado")
+
                         print("   [Notas] ✅ Prova lançada com sucesso.")
                         relatorio_telegram += "  ✅ Prova lançada com sucesso.\n"
                         
