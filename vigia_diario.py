@@ -933,7 +933,7 @@ def vigiar():
                 for aula in minhas_aulas:
                     print(f"\n -> Iniciando Aula: {aula['turma']} ({aula['data']})")
                     relatorio_telegram += f"🏫 <b>{aula['turma']} ({aula['data']})</b>\n"
-                    
+                try:    
                         try:
                             navegador.switch_to.default_content()
                         except Exception:
