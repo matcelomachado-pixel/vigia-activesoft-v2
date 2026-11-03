@@ -1116,7 +1116,7 @@ def vigiar():
                                 safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
                                 relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:100]}\n"
                                 
-                    except Exception as erro_abrir_painel:
+                            except Exception as erro_abrir_painel:
                         if "Processando..." in aula['status_diario'] or "Pendente" in aula['status_diario']:
                             safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
                         if "Processando..." in aula['status_ocorrencia'] or "Pendente" in aula['status_ocorrencia']:
