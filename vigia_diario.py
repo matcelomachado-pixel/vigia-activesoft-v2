@@ -1159,22 +1159,20 @@ def vigiar():
                         else:
                             nome_traduzido = aba_nota_limpa
                             
-                        turma_busca = MAPA_TURMAS.get(nome_traduzido, nome_traduzido)
+                       turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'].upper().strip())
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
-                        # 🔥 NOVA BLINDAGEM: O Vigia vai procurar por TODAS as variações de nome ao mesmo tempo
-                        condicao_turma = f"(contains(text(), '{turma_busca}') or contains(text(), '{nome_traduzido}') or contains(text(), '{nome_traduzido.replace('º', '°')}'))"
-                        
                         if disciplina_busca:
-                            xpath_notas = f"//*[{condicao_turma}]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')] | //*[{condicao_turma}]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')]"
+                            xpath_notas = f"//*[contains(text(), '{turma_busca}')]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_busca}')]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')]"
                         else:
-                            xpath_notas = f"//*[{condicao_turma}]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[{condicao_turma}]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
+                            xpath_notas = f"//*[contains(text(), '{turma_busca}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_busca}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
+                        
                         if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
                             raise Exception(f"Turma '{turma_busca}' não foi achada na tela de notas.")
                             
                         time.sleep(6) 
                         
-                        # 🔥 CORREÇÃO: Injetando a etapa atual no pacote antes de lançar
+                        # 🔥 Correção mantida: Injetando a etapa atual no pacote antes de lançar
                         nota['etapa'] = etapa_atual 
                         
                         lancar_notas(navegador, wait, nota)
