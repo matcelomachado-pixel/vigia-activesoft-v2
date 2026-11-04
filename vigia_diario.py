@@ -63,9 +63,9 @@ def conectar_sheets():
             client = gspread.authorize(creds)
             return client.open_by_key(SPREADSHEET_ID)
         except Exception as e:
-            if '429' in str(e) or 'Quota' in str(e):
+            if '429' in str(e) or 'Quota' in str(e) or '500' in str(e) or '502' in str(e) or '503' in str(e):
                 espera = 10 * (tentativa + 1)
-                print(f"⏳ Limite do Google (429). Aguardando {espera}s...")
+                print(f"⏳ Instabilidade no Google (Erro). Aguardando {espera}s...")
                 time.sleep(espera)
             else:
                 raise e
