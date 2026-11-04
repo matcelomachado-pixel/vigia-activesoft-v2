@@ -1117,13 +1117,13 @@ def vigiar():
                                 relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:100]}\n"
                                 
                             except Exception as erro_abrir_painel:
-                                if "Processando..." in aula['status_diario'] or "Pendente" in aula['status_diario']:
-                                    safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
-                                if "Processando..." in aula['status_ocorrencia'] or "Pendente" in aula['status_ocorrencia']:
-                                    safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
-                                if "Processando..." in aula['status_falta'] or "Pendente" in aula['status_falta']:
-                                    safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
-                                    relatorio_telegram += "  🚨 Falha geral ao abrir a turma no painel.\n"
+                        if "Processando..." in aula['status_diario'] or "Pendente" in aula['status_diario']:
+                            safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
+                        if "Processando..." in aula['status_ocorrencia'] or "Pendente" in aula['status_ocorrencia']:
+                            safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_ocorrencia'], "Erro Sistema")
+                        if "Processando..." in aula['status_falta'] or "Pendente" in aula['status_falta']:
+                            safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
+                        relatorio_telegram += "  🚨 Falha geral ao abrir a turma no painel.\n"
 
                 # --- PROCESSA AS NOTAS ---
                 for nota in minhas_notas:
