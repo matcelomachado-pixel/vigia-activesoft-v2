@@ -933,7 +933,8 @@ def vigiar():
                 for aula in minhas_aulas:
                     print(f"\n -> Iniciando Aula: {aula['turma']} ({aula['data']})")
                     relatorio_telegram += f"🏫 <b>{aula['turma']} ({aula['data']})</b>\n"
-                try:    
+                    
+                    try:
                         try:
                             navegador.switch_to.default_content()
                         except Exception:
@@ -1116,7 +1117,7 @@ def vigiar():
                                 safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_falta'], "Erro Sistema")
                                 relatorio_telegram += f"  ❌ Erro Faltas: {str(e_falta)[:100]}\n"
                                 
-                            except Exception as erro_abrir_painel:
+                    except Exception as erro_abrir_painel:
                         if "Processando..." in aula['status_diario'] or "Pendente" in aula['status_diario']:
                             safe_update(aula['aba'], aula['linha_planilha'], aula['col_status_diario'], "Erro Sistema")
                         if "Processando..." in aula['status_ocorrencia'] or "Pendente" in aula['status_ocorrencia']:
@@ -1158,7 +1159,7 @@ def vigiar():
                         else:
                             nome_traduzido = aba_nota_limpa
                             
-                       turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'].upper().strip())
+                        turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'].upper().strip())
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
                         if disciplina_busca:
