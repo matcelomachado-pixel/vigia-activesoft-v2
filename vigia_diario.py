@@ -25,17 +25,16 @@ SPREADSHEET_ID = '17XZfEUKiiryGJgj_nXdQ7gXzdByEwsZ7ecax44ZeJmc'
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 MAPA_TURMAS = {
-    "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD",
-    "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD", "8B": "EFII-8B-FD",
-    "9º ANO A": "EFII-9A-FD", "9º A": "EFII-9A-FD", "9 ANO A": "EFII-9A-FD", "9A": "EFII-9A-FD",
-    "9º ANO B": "EFII-9B-FD", "9º B": "EFII-9B-FD", "9 ANO B": "EFII-9B-FD", "9B": "EFII-9B-FD",
-    "1ª SÉRIE": "1ª SÉRIE", "1ª SÉRIE EM": "1ª SÉRIE", "1EM": "1ª SÉRIE", "1": "1ª SÉRIE",
-    "2ª SÉRIE": "EM-2SEM-FD", "2ª SÉRIE EM": "EM-2SEM-FD", "2 SÉRIE": "EM-2SEM-FD", "2EM": "EM-2SEM-FD", "2": "EM-2SEM-FD",
-    "3ª SÉRIE": "EM-3SEM-FD", "3ª SÉRIE EM": "EM-3SEM-FD", "3 SÉRIE": "EM-3SEM-FD", "3EM": "EM-3SEM-FD", "3": "EM-3SEM-FD",
-    "6º ANO A": "6° ANO A", "6º ANO B": "6º ANO B", "6º A": "6° ANO A", "6º B": "6º ANO B", "6A": "6° ANO A", "6B": "6º ANO B", "6": "6° ANO A",
-    "7º ANO A": "7° ANO A", "7º ANO B": "7º ANO B", "7º A": "7° ANO A", "7º B": "7º ANO B", "7A": "7° ANO A", "7B": "7º ANO B", "7": "7° ANO A"
+    "8º ANO A": "EFII-8A-FD", "8º A": "EFII-8A-FD", "8 ANO A": "EFII-8A-FD", "8A": "EFII-8A-FD", "M2FERNODIAS_8A": "EFII-8A-FD",
+    "8º ANO B": "EFII-8B-FD", "8º B": "EFII-8B-FD", "8 ANO B": "EFII-8B-FD", "8B": "EFII-8B-FD", "M2FERNODIAS_8B": "EFII-8B-FD",
+    "9º ANO A": "EFII-9A-FD", "9º A": "EFII-9A-FD", "9 ANO A": "EFII-9A-FD", "9A": "EFII-9A-FD", "M2FERNODIAS_9A": "EFII-9A-FD",
+    "9º ANO B": "EFII-9B-FD", "9º B": "EFII-9B-FD", "9 ANO B": "EFII-9B-FD", "9B": "EFII-9B-FD", "M2FERNODIAS_9B": "EFII-9B-FD",
+    "1ª SÉRIE": "1ª SÉRIE", "1ª SÉRIE EM": "1ª SÉRIE", "1EM": "1ª SÉRIE", "1": "1ª SÉRIE", "M2FERNODIAS_1": "1ª SÉRIE",
+    "2ª SÉRIE": "EM-2SEM-FD", "2ª SÉRIE EM": "EM-2SEM-FD", "2 SÉRIE": "EM-2SEM-FD", "2EM": "EM-2SEM-FD", "2": "EM-2SEM-FD", "M2FERNODIAS_2": "EM-2SEM-FD",
+    "3ª SÉRIE": "EM-3SEM-FD", "3ª SÉRIE EM": "EM-3SEM-FD", "3 SÉRIE": "EM-3SEM-FD", "3EM": "EM-3SEM-FD", "3": "EM-3SEM-FD", "M2FERNODIAS_3": "EM-3SEM-FD",
+    "6º ANO A": "6° ANO A", "6º ANO B": "6º ANO B", "6º A": "6° ANO A", "6º B": "6º ANO B", "6A": "6° ANO A", "6B": "6º ANO B", "6": "6° ANO A", "M2FERNODIAS_6A": "6° ANO A", "M2FERNODIAS_6B": "6º ANO B",
+    "7º ANO A": "7° ANO A", "7º ANO B": "7º ANO B", "7º A": "7° ANO A", "7º B": "7º ANO B", "7A": "7° ANO A", "7B": "7º ANO B", "7": "7° ANO A", "M2FERNODIAS_7A": "7° ANO A", "M2FERNODIAS_7B": "7º ANO B"
 }
-
 JS_REACT_SETTER = """
     let elemento = arguments[0];
     let valor = arguments[1];
@@ -895,7 +894,7 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        turma_busca = nota['turma'].upper().strip()
+                        turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'].upper().strip())
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
                         if disciplina_busca:
