@@ -516,81 +516,40 @@ def lancar_faltas(navegador, wait, aula, etapa_atual):
         raise Exception(f"Falha na Frequência: {e}")
 
 def lancar_notas(navegador, wait, nota_info):
-    input_escondido = None
-    for tentativa in range(12):
-        try:
-            navegador.switch_to.default_content()
-            input_escondido = navegador.find_element(By.XPATH, "//input[contains(@id, 'react-select')]")
-            if input_escondido:
-                break
-        except Exception:
-            pass
-            
-        frames = navegador.find_elements(By.TAG_NAME, "iframe") + navegador.find_elements(By.TAG_NAME, "frame")
-        for f in frames:
-            navegador.switch_to.default_content()
-            try:
-                navegador.switch_to.frame(f)
-                input_escondido = navegador.find_element(By.XPATH, "//input[contains(@id, 'react-select')]")
-                if input_escondido:
-                    break
-            except Exception:
-                pass
-                
-        if input_escondido:
-            break
-            
-        time.sleep(1.5)
-        
-    if not input_escondido:
-        raise Exception("Campo de Etapa sumiu.")
-    
+    js_react_setter = """
+        let elemento = arguments[0];
+        let valor = arguments[1];
+        let setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(elemento, valor);
+        elemento.dispatchEvent(new Event('input', { bubbles: true }));
+        elemento.dispatchEvent(new Event('change', { bubbles: true }));
+    """
+
     try:
-        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_escondido)
-        time.sleep(0.5)
+        # 1. SELECIONAR A ETAPA
+        input_escondido = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'react-select')]")))
         navegador.execute_script("arguments[0].parentNode.parentNode.click();", input_escondido)
+        time.sleep(1)
+        
+        navegador.execute_script("arguments[0].focus();", input_escondido)
+        input_escondido.send_keys(nota_info['etapa'])
         time.sleep(1.5) 
         
-        clicou = False
-        opcoes = navegador.find_elements(By.XPATH, f"//div[contains(text(), '{nota_info['etapa']}')] | //li[contains(text(), '{nota_info['etapa']}')] | //span[contains(text(), '{nota_info['etapa']}')]")
-        
-        if opcoes: 
-            for op in reversed(opcoes):
-                if op.is_displayed():
-                    try:
-                        navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", op)
-                        time.sleep(0.5)
-                        try:
-                            op.click()
-                        except Exception:
-                            webdriver.ActionChains(navegador).move_to_element(op).click().perform()
-                        clicou = True
-                        break
-                    except Exception:
-                        pass
-                
-        if not clicou:
-            navegador.execute_script("arguments[0].focus();", input_escondido)
-            try:
-                input_escondido.send_keys(nota_info['etapa'])
-            except Exception:
-                pass
-            time.sleep(1.5)
-            try:
-                input_escondido.send_keys(Keys.ARROW_DOWN)
-                time.sleep(0.5)
-                input_escondido.send_keys(Keys.ENTER)
-            except Exception:
-                navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", input_escondido)
-                time.sleep(0.5)
-                navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", input_escondido)
-                
+        opcoes = navegador.find_elements(By.XPATH, f"//div[text()='{nota_info['etapa']}']")
+        if opcoes:
+            navegador.execute_script("arguments[0].click();", opcoes[-1])
+        else:
+            navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'ArrowDown'}));", input_escondido)
+            time.sleep(0.5)
+            navegador.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", input_escondido)
+            
         time.sleep(1.5)
         
         btn_consultar = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Consultar')]")))
-        navegador.execute_script("arguments[0].click();", btn_consultar)
+        navegador.execute_script("arguments[0].click();", btn_consultar) 
         time.sleep(3) 
 
+        # 2. INSERIR NOVA AVALIAÇÃO
         btn_inserir = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Inserir avaliação')] | //*[name()='svg' and contains(@class, 'FaseNota')]")))
         navegador.execute_script("arguments[0].click();", btn_inserir)
         time.sleep(1.5)
@@ -599,31 +558,29 @@ def lancar_notas(navegador, wait, nota_info):
         navegador.execute_script("arguments[0].click();", btn_nova)
         time.sleep(1.5) 
         
+        # 3. PREENCHER POP-UP
         input_nome = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'Input-sg8yoa-0') and not(@readonly)]")))
-        navegador.execute_script(JS_REACT_SETTER, input_nome, nota_info['nome_prova'])
+        navegador.execute_script(js_react_setter, input_nome, nota_info['nome_prova'])
         time.sleep(0.5)
         
         input_data = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'Datepicker')]")))
-        navegador.execute_script(JS_REACT_SETTER, input_data, nota_info['data_prova'])
+        navegador.execute_script(js_react_setter, input_data, nota_info['data_prova'])
         time.sleep(0.5)
-        try:
-            input_data.send_keys(Keys.ENTER)
-            time.sleep(0.5)
-            input_data.send_keys(Keys.ESCAPE)
-        except Exception:
-            pass
         
         input_valor = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@class, 'InputDecimal')]")))
-        navegador.execute_script(JS_REACT_SETTER, input_valor, nota_info['valor_prova'])
+        navegador.execute_script(js_react_setter, input_valor, nota_info['valor_prova'])
         time.sleep(0.5)
         
         btn_salvar = wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Salvar')]")))
         navegador.execute_script("arguments[0].click();", btn_salvar)
         
-        btn_fechar = WebDriverWait(navegador, 10).until(EC.presence_of_element_located((By.XPATH, "//button[contains(@class, 'swal2-confirm') or text()='Fechar']")))
+        wait_modal = WebDriverWait(navegador, 10)
+        btn_fechar = wait_modal.until(EC.presence_of_element_located((By.XPATH, "//button[contains(@class, 'swal2-confirm') or text()='Fechar']")))
         navegador.execute_script("arguments[0].click();", btn_fechar)
+            
         time.sleep(3)
         
+        # 4. LANÇAR NOTAS NA TABELA
         cabecalhos_provas = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//div[contains(@class, 'TextClick')]")))
         
         indice_coluna_alvo = -1
@@ -635,34 +592,21 @@ def lancar_notas(navegador, wait, nota_info):
         if indice_coluna_alvo == -1:
             indice_coluna_alvo = len(cabecalhos_provas) - 1 
         
-        for num_aluno, nota in nota_info['notas_alunos'].items():
+        for numero_aluno, nota in nota_info['notas_alunos'].items():
             try:
-                linha_aluno = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[text()='{num_aluno}']/ancestor::tr")))
+                linha_aluno = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[text()='{numero_aluno}']/ancestor::tr")))
                 todas_as_caixas = linha_aluno.find_elements(By.XPATH, ".//input[contains(@class, 'InputNotaStyled')]")
                 
-                if len(todas_as_caixas) > indice_coluna_alvo:
-                    input_nota_certo = todas_as_caixas[indice_coluna_alvo]
-                    navegador.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_nota_certo)
-                    time.sleep(0.2)
-                    
-                    if str(nota).strip() in ["0", "0.0", "0,0"]:
-                        try:
-                            input_nota_certo.click()
-                            input_nota_certo.send_keys(Keys.BACKSPACE)
-                            input_nota_certo.send_keys("0,0") 
-                        except Exception:
-                            navegador.execute_script(JS_REACT_SETTER, input_nota_certo, "0,0")
-                    else:
-                        navegador.execute_script(JS_REACT_SETTER, input_nota_certo, nota)
-                        
-                    time.sleep(0.2)
-                    input_nota_certo.send_keys(Keys.TAB)
-                    time.sleep(0.5)
+                input_nota_certo = todas_as_caixas[indice_coluna_alvo]
+                navegador.execute_script(js_react_setter, input_nota_certo, str(nota))
+                time.sleep(0.2)
+                input_nota_certo.send_keys(Keys.TAB)
+                time.sleep(0.5)
             except Exception:
                 pass
+
     except Exception as e:
         raise e
-
 # ================= MOTOR CENTRAL =================
 def vigiar():
     print("="*60)
@@ -951,8 +895,8 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        turma_busca = MAPA_TURMAS.get(aula['turma_ativa'].upper().strip(), aula['turma_ativa'].upper().strip())
-                        disciplina_busca = aula.get('disciplina', '').strip().upper()
+                        turma_busca = nota['turma'].upper().strip()
+                        disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
                         if disciplina_busca:
                             xpath_diario = f"//*[contains(text(), '{turma_busca}')]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//a[contains(text(), 'Diário de classe')] | //*[contains(text(), '{turma_busca}')]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//a[contains(text(), 'Diário de classe')]"
