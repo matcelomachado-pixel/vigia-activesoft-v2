@@ -1159,7 +1159,8 @@ def vigiar():
                         else:
                             nome_traduzido = aba_nota_limpa
                             
-                        turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'].upper().strip())
+                        # Bypass direto: ignora o MAPA_TURMAS e procura o nome comercial da aba na tela de notas
+                        turma_busca = nota['turma'].upper().strip()
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
                         if disciplina_busca:
