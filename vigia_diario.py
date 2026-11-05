@@ -894,7 +894,19 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        turma_busca = MAPA_TURMAS.get(nota['turma'].upper().strip(), nota['turma'].upper().strip())
+                        # 🔥 MAPA EXCLUSIVO PARA O ECRÃ DE NOTAS (Ignora os códigos técnicos do MAPA_TURMAS)
+                        MAPA_NOTAS = {
+                            "8A": "8º ANO A", "8B": "8º ANO B", "M2FERNODIAS_8A": "8º ANO A", "M2FERNODIAS_8B": "8º ANO B", "8º ANO B": "8º ANO B",
+                            "9A": "9º ANO A", "9B": "9º ANO B", "M2FERNODIAS_9A": "9º ANO A", "M2FERNODIAS_9B": "9º ANO B", "9º ANO B": "9º ANO B",
+                            "1": "1ª SÉRIE", "1EM": "1ª SÉRIE", "M2FERNODIAS_1": "1ª SÉRIE", "1ª SÉRIE": "1ª SÉRIE",
+                            "2": "2ª SÉRIE", "2EM": "2ª SÉRIE", "M2FERNODIAS_2": "2ª SÉRIE", "2ª SÉRIE": "2ª SÉRIE",
+                            "3": "3ª SÉRIE", "3EM": "3ª SÉRIE", "M2FERNODIAS_3": "3ª SÉRIE", "3ª SÉRIE": "3ª SÉRIE",
+                            "6A": "6° ANO A", "6B": "6º ANO B", "M2FERNODIAS_6A": "6° ANO A", "M2FERNODIAS_6B": "6º ANO B", "6º ANO B": "6º ANO B",
+                            "7A": "7° ANO A", "7B": "7º ANO B", "M2FERNODIAS_7A": "7° ANO A", "M2FERNODIAS_7B": "7º ANO B", "7º ANO B": "7º ANO B"
+                        }
+                        
+                        nome_aba = nota['turma'].upper().strip()
+                        turma_busca = MAPA_NOTAS.get(nome_aba, nome_aba)
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
                         if disciplina_busca:
