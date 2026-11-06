@@ -1111,13 +1111,16 @@ def vigiar():
                         
                         nome_da_aba = nota['turma'].upper().strip()
                         turma_busca = TRADUTOR_ABA_PARA_TELA.get(nome_da_aba, nome_da_aba)
+                        turma_grau = turma_busca.replace("º", "°").replace("ª", "ᵃ")
+                        turma_cod = MAPA_TURMAS.get(turma_busca, turma_busca)
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
-                        if disciplina_busca:
-                            xpath_notas = f"//*[contains(text(), '{turma_busca}')]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_busca}')]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')]"
-                        else:
-                            xpath_notas = f"//*[contains(text(), '{turma_busca}')]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[contains(text(), '{turma_busca}')]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
+                        cond_turma = f"(contains(text(), '{turma_busca}') or contains(text(), '{turma_grau}') or contains(text(), '{turma_cod}'))"
                         
+                        if disciplina_busca:
+                            xpath_notas = f"//*[{cond_turma}]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')] | //*[{cond_turma}]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')]"
+                        else:
+                            xpath_notas = f"//*[{cond_turma}]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[{cond_turma}]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
                         if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
                             raise Exception(f"Turma '{turma_busca}' não foi achada na tela de notas.")
                             
