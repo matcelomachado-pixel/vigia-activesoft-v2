@@ -1109,19 +1109,28 @@ def vigiar():
                             "M2FERNODIAS_7B": "7º ANO B", "7B": "7º ANO B"
                         }
                         
-                        nome_da_aba = nota['turma'].upper().strip()
-                        turma_busca = TRADUTOR_ABA_PARA_TELA.get(nome_da_aba, nome_da_aba)
-                        turma_grau = turma_busca.replace("º", "°").replace("ª", "ᵃ")
-                        turma_cod = MAPA_TURMAS.get(turma_busca, turma_busca)
+                        # Puxa o nome exato da turma que o vigia_scan já gravou na aba 'registros_' correspondente
+                        nome_da_aba = nota['turma'].strip()
+                        try:
+                            aba_reg_correspondente = planilha.worksheet(f"registros_{nome_da_aba}")
+                            dados_reg_turma = safe_get_values(aba_reg_correspondente)
+                            cab_reg = [str(c).strip().upper() for c in dados_reg_turma[0]]
+                            idx_t = cab_reg.index("TURMA_ACTIVESOFT")
+                            turma_oficial = str(dados_reg_turma[1][idx_t]).strip()
+                        except Exception:
+                            turma_oficial = nome_da_aba.upper()
+
+                        turma_busca = MAPA_TURMAS.get(turma_oficial.upper(), turma_oficial)
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
-                        cond_turma = f"(contains(text(), '{turma_busca}') or contains(text(), '{turma_grau}') or contains(text(), '{turma_cod}'))"
+                        # Procura tanto pelo nome gravado no registros_ quanto pelo código do MAPA_TURMAS
+                        cond_turma = f"(contains(text(), '{turma_oficial}') or contains(text(), '{turma_busca}'))"
                         
                         if disciplina_busca:
                             xpath_notas = f"//*[{cond_turma}]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')] | //*[{cond_turma}]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')]"
                         else:
                             xpath_notas = f"//*[{cond_turma}]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[{cond_turma}]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
-                        if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
+                            if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
                             raise Exception(f"Turma '{turma_busca}' não foi achada na tela de notas.")
                             
                         time.sleep(6) 
