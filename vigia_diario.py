@@ -1093,22 +1093,6 @@ def vigiar():
                         achar_e_clicar(navegador, "//button[contains(text(), 'Exibir') or text()='Exibir']", tempo_espera=3)
                         time.sleep(3)
 
-                        # 🔥 NOVO TRADUTOR: Decodifica M2FERNODIAS_8A para 8º ANO A
-                        # TRADUTOR ISOLADO: Converte o nome da ABA das notas para o NOME COMERCIAL da tela
-                        TRADUTOR_ABA_PARA_TELA = {
-                            "M2FERNODIAS_8A": "8º ANO A", "8A": "8º ANO A",
-                            "M2FERNODIAS_8B": "8º ANO B", "8B": "8º ANO B",
-                            "M2FERNODIAS_9A": "9º ANO A", "9A": "9º ANO A",
-                            "M2FERNODIAS_9B": "9º ANO B", "9B": "9º ANO B",
-                            "M2FERNODIAS_1": "1ª SÉRIE",  "1EM": "1ª SÉRIE", "1": "1ª SÉRIE",
-                            "M2FERNODIAS_2": "2ª SÉRIE",  "2EM": "2ª SÉRIE", "2": "2ª SÉRIE",
-                            "M2FERNODIAS_3": "3ª SÉRIE",  "3EM": "3ª SÉRIE", "3": "3ª SÉRIE",
-                            "M2FERNODIAS_6A": "6° ANO A", "6A": "6° ANO A",
-                            "M2FERNODIAS_6B": "6º ANO B", "6B": "6º ANO B",
-                            "M2FERNODIAS_7A": "7° ANO A", "7A": "7° ANO A",
-                            "M2FERNODIAS_7B": "7º ANO B", "7B": "7º ANO B"
-                        }
-                        
                         # Puxa o nome exato da turma que o vigia_scan já gravou na aba 'registros_' correspondente
                         nome_da_aba = nota['turma'].strip()
                         try:
@@ -1123,19 +1107,18 @@ def vigiar():
                         turma_busca = MAPA_TURMAS.get(turma_oficial.upper(), turma_oficial)
                         disciplina_busca = nota.get('disciplina', '').strip().upper()
                         
-                        # Procura tanto pelo nome gravado no registros_ quanto pelo código do MAPA_TURMAS
                         cond_turma = f"(contains(text(), '{turma_oficial}') or contains(text(), '{turma_busca}'))"
                         
                         if disciplina_busca:
                             xpath_notas = f"//*[{cond_turma}]/ancestor::tr[contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')] | //*[{cond_turma}]/ancestor::div[contains(@class, 'card')][contains(translate(., 'áéíóúãõç', 'AEIOUAOC'), '{disciplina_busca}')]//*[contains(text(), 'Digitação de notas')]"
                         else:
                             xpath_notas = f"//*[{cond_turma}]/ancestor::tr//*[contains(text(), 'Digitação de notas')] | //*[{cond_turma}]/ancestor::div[contains(@class, 'card')]//*[contains(text(), 'Digitação de notas')]"
-                            if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
+                        
+                        if not achar_e_clicar(navegador, xpath_notas, tempo_espera=5):
                             raise Exception(f"Turma '{turma_busca}' não foi achada na tela de notas.")
                             
                         time.sleep(6) 
                         
-                        # 🔥 Correção mantida: Injetando a etapa atual no pacote antes de lançar
                         nota['etapa'] = etapa_atual 
                         
                         lancar_notas(navegador, wait, nota)
